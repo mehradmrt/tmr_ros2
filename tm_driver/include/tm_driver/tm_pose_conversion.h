@@ -40,7 +40,7 @@ public:
         tf::Quaternion quat;
         quat.setRPY(r, p, y);
         tf::quaternionTFToMsg(quat, msg);
-    }
+    } 
     static inline void quat_msg_from_rpy(geometry_msgs::Quaternion &msg, const std::vector<double> &vec)
     {
         if (vec.size() == 3) quat_msg_from_rpy(msg, vec[0], vec[1], vec[2]);

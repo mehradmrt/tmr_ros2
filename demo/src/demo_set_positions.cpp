@@ -1,6 +1,6 @@
 #include "rclcpp/rclcpp.hpp"
 #include "tm_msgs/srv/set_positions.hpp"
-
+ 
 #include <chrono>
 #include <cstdlib>
 #include <memory>
@@ -8,6 +8,7 @@
 using namespace std::chrono_literals;
 
 int main(int argc, char **argv)
+
 {
   rclcpp::init(argc, argv);
 
@@ -17,12 +18,12 @@ int main(int argc, char **argv)
     node->create_client<tm_msgs::srv::SetPositions>("set_positions");
   
   auto request = std::make_shared<tm_msgs::srv::SetPositions::Request>();
-  request->motion_type = tm_msgs::srv::SetPositions::Request::PTP_J;
+  request->motion_type = tm_msgs::srv::SetPositions::Request::PTP_T;
+  request->positions.push_back(-0.108);
+  request->positions.push_back(0.231);
+  request->positions.push_back(0.933);
   request->positions.push_back(0);
   request->positions.push_back(0);
-  request->positions.push_back(1.58);
-  request->positions.push_back(0);
-  request->positions.push_back(1.58);
   request->positions.push_back(0);
   request->velocity = 0.4;//rad/s
   request->acc_time = 0.2;

@@ -9,7 +9,7 @@ int8 LINE_T = 4
 int8 CIRC_T = 6
 #int8 PLINE_J = 7
 int8 PLINE_T = 8
-
+ 
 int8 motion_type
 float64[] positions
 float64 velocity       # motion velocity: if expressed in Cartesian coordinate (unit: m/s) , if expressed in joint velocity (unit: rad/s, and the maximum value is limited to pi )
