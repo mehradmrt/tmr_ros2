@@ -40,14 +40,15 @@ bool send_cmd(std::string cmd, std::shared_ptr<rclcpp::Node> node, rclcpp::Clien
 int main(int argc, char **argv)
 {
   rclcpp::init(argc, argv);
-
-
+  
+  
   std::shared_ptr<rclcpp::Node> node = rclcpp::Node::make_shared("demo_send_script");
   rclcpp::Client<tm_msgs::srv::SendScript>::SharedPtr client =
     node->create_client<tm_msgs::srv::SendScript>("send_script");
   
-  std::string cmd = "PTP(\"JPP\",0,0,90,0,90,0,35,200,0,false)";
-  
+  // std::string cmd = "PTP(\"JPP\",0,0,90,0,90,0,35,200,0,false)";
+  std::string cmd = "Move_PTP(\"TPP\",69.128    ,  79.145    ,  256.38   ,  -26.392  ,   -65.405   ,   123.12, 20,200,0,false)";
+
   send_cmd(cmd, node, client);
 
   rclcpp::shutdown();

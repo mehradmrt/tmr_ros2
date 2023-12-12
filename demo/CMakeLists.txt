@@ -256,6 +256,4 @@ demo_leave_listen_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
-
-
 ament_package()
