@@ -43,7 +43,7 @@ if (moveit_ros_planning_interface_FOUND)
   message("--- TMDriver message : MoveIt2_LIB is found")
   endif()
 
-  add_executable(run_moveit_cpp src/run_moveit_cpp.cpp)
+  add_executable(run_moveit_cpp src/run_moveit_cpp_v2.cpp)
   ament_target_dependencies(run_moveit_cpp
     moveit_ros_planning_interface
     Boost

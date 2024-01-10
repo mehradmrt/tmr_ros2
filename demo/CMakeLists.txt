@@ -41,9 +41,24 @@ include_directories(include
   ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
+# add_executable(send_script_interactive 
+#   src/send_script_interactive.cpp
+# )
+# ament_target_dependencies(send_script_interactive
+#   rclcpp
+#   std_msgs
+#   sensor_msgs
+#   tm_msgs
+# )
+
+# install(TARGETS
+# send_script_interactive
+#   DESTINATION lib/${PROJECT_NAME}
+# )
+
+
 add_executable(demo_send_script 
   src/demo_send_script.cpp
- 
 )
 ament_target_dependencies(demo_send_script
   rclcpp

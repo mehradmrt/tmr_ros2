@@ -46,7 +46,8 @@ int main(int argc, char **argv)
   rclcpp::Client<tm_msgs::srv::SendScript>::SharedPtr client =
     node->create_client<tm_msgs::srv::SendScript>("send_script");
   
-  std::string cmd = "Move_PTP(\"TPP\",15.578   ,   263.09    ,  304.38    ,  70.535   ,   74.754   ,   55.686,20,200,0,false)";
+  // std::string cmd = "PTP(\"JPP\",0,0,90,0,90,0,35,200,0,false)";
+  std::string cmd = "Move_PTP(\"TPP\",69.128    ,79.145    ,  256.38   ,  -26.392  ,   -65.405   ,   123.12, 20,200,0,false)";
 
   send_cmd(cmd, node, client);
 
