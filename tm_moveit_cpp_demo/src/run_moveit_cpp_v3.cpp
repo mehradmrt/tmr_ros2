@@ -50,11 +50,10 @@
 #include <moveit_msgs/msg/display_robot_state.hpp>
 #include <trajectory_msgs/msg/joint_trajectory.hpp>
 
-#include <tf2/LinearMath/Quaternion.h>
+
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
-#include <tf2_ros/transform_listener.h>
-#include <geometry_msgs/msg/pose_array.hpp>
 #include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
 
 
 static const rclcpp::Logger LOGGER = rclcpp::get_logger("moveit_cpp_demo");
@@ -63,15 +62,14 @@ class MoveItCppDemo
 {
 public:
   MoveItCppDemo(const rclcpp::Node::SharedPtr& node)
-    : node_(node),
-    robot_state_publisher_(node_->create_publisher<moveit_msgs::msg::DisplayRobotState>("display_robot_state", 1)),
-    tfBuffer_(std::make_shared<rclcpp::Clock>()),
-    tfListener_(tfBuffer_)
+    : node_(node)
+    , tfBuffer_(std::make_shared<tf2_ros::Buffer>(node_->get_clock()))
+    , tfListener_(*tfBuffer_)
+    , robot_state_publisher_(node_->create_publisher<moveit_msgs::msg::DisplayRobotState>("display_robot_state", 1))
   {
-    this->pose_array_subscriber_ = node_->create_subscription<geometry_msgs::msg::PoseArray>(
-        "/target_leaves", 10, std::bind(&MoveItCppDemo::poseArrayCallback, this, std::placeholders::_1));
+    // existing initialization code...
   }
- 
+
   void run()
   {
     RCLCPP_INFO(LOGGER, "Initialize MoveItCpp");
@@ -106,138 +104,82 @@ public:
     collision_object.primitives.push_back(box);
     collision_object.primitive_poses.push_back(box_pose);
     collision_object.operation = collision_object.ADD;
- 
+
+    // Add object to planning scene
     {  // Lock PlanningScene
       planning_scene_monitor::LockedPlanningSceneRW scene(moveit_cpp_->getPlanningSceneMonitor());
       scene->processCollisionObjectMsg(collision_object);
     }  // Unlock PlanningScene
 
-    // checkPlannability(arm);
-    // if (!base_pose_array_.poses.empty()) 
-    // {
-    // approachable_targets_.poses.clear(); 
-    // std::string result = std::to_string(base_pose_array_.poses.size()) + " targets: ";
-    // for (const auto& pose : base_pose_array_.poses) {
-    //     geometry_msgs::msg::PoseStamped target;
-    //     target.pose = pose;
-    //     arm.setGoal(target, "link_6"); 
+    geometry_msgs::msg::PoseStamped p1;
+    p1.pose.position.y = 0.1;
+    p1.pose.orientation.w = 1;
+    p1.header.frame_id = "link_6";
+    p1.header.stamp = node_->get_clock()->now();
 
-    //     auto plan_solution = arm.plan();
-    //     if (plan_solution) {
-    //         result += "Yes, ";
-    //         approachable_targets_.poses.push_back(pose); 
-    //     } else {
-    //         result += "No, ";
-    //     }
-    // }
+    // Transform p1 to link_0 frame
+    geometry_msgs::msg::PoseStamped p1_transformed = transformPose(p1, "link_0");
 
-    // result.pop_back(); 
-    // result.pop_back();
-    // RCLCPP_INFO(LOGGER, "Plannability %s", result.c_str());
-
+    RCLCPP_INFO(LOGGER, "Set goal");
+    arm.setGoal(p1_transformed, "link_6");
     // rclcpp::sleep_for(std::chrono::seconds(5));
+    
+    // Set joint state goal
+    // RCLCPP_INFO(LOGGER, "Set goal");
+    // arm.setGoal("ready1");
 
-
-    for (const auto& app_pose : base_pose_array_.poses) 
+    // Run actual plan
+    RCLCPP_INFO(LOGGER, "Plan to goal");
+    auto plan_solution = arm.plan();
+    if (plan_solution)
     {
-      geometry_msgs::msg::PoseStamped app_target;
-      app_target.pose = app_pose;
-      arm.setGoal(app_target, "link_6"); 
-
-      auto plan_solution = arm.plan();
-
       RCLCPP_INFO(LOGGER, "arm.execute()");
       arm.execute();
-      rclcpp::sleep_for(std::chrono::seconds(10));
     }
-    // geometry_msgs::msg::PoseStamped target;
-    // target.pose.position.x = 0;
-    // target.pose.position.y = 0;
-    // target.pose.position.z =  0.1;  
- 
-    // // Set the pose goal
-    // arm.setGoal(target, "link_6"); 
 
-    // // Run actual plan
-    // RCLCPP_INFO(LOGGER, "Plan to goal");
-    // auto plan_solution = arm.plan();
-    // if (plan_solution)
-    // {
-    //   RCLCPP_INFO(LOGGER, "arm.execute()");
-    //   // arm.execute();
-    // }
-  }
+    //Below, we simply use a long delay to wait for the previous motion to complete.
+    /*rclcpp::sleep_for(std::chrono::seconds(10));   
 
-  void poseArrayCallback(const geometry_msgs::msg::PoseArray::SharedPtr msg) 
-  {
-    base_pose_array_.poses.clear();
+    // Set joint state goal
+    RCLCPP_INFO(LOGGER, "Set goal (home)");
+    arm.setGoal("home");
 
-    for (const auto& tool_pose : msg->poses) 
+    // Run actual plan
+    RCLCPP_INFO(LOGGER, "Plan to goal");
+    plan_solution = arm.plan();
+    if (plan_solution)
     {
-      try {
-        geometry_msgs::msg::PoseStamped input_pose;
-        input_pose.pose = tool_pose;
-        input_pose.header.frame_id = "link_6";
-        input_pose.header.stamp = node_->get_clock()->now();
-
-        geometry_msgs::msg::PoseStamped new_pose_;
-        if (tfBuffer_.canTransform("link_0", "link_6", tf2::TimePointZero)) 
-        {
-          new_pose_ = tfBuffer_.transform(input_pose, "link_0", tf2::durationFromSec((0.1)));
-          new_pose_.header.frame_id = "link_0";
-          base_pose_array_.poses.push_back(new_pose_.pose);
-          RCLCPP_INFO(LOGGER, "TF2 transformation with Header: [%s], Position: [%.2f, %.2f, %.2f], Orientation: [%.2f, %.2f, %.2f, %.2f]", 
-            new_pose_.header.frame_id.c_str(),
-            new_pose_.pose.position.x, 
-            new_pose_.pose.position.y, 
-            new_pose_.pose.position.z, 
-            new_pose_.pose.orientation.x, 
-            new_pose_.pose.orientation.y, 
-            new_pose_.pose.orientation.z, 
-            new_pose_.pose.orientation.w);
-        }
-      } catch (tf2::TransformException &ex) {
-          RCLCPP_ERROR(node_->get_logger(), "TF2 exception: %s", ex.what());
-      }
-    }
-    run();
-  }
-
-  void checkPlannability(moveit::planning_interface::PlanningComponent& arm) {
-      approachable_targets_.poses.clear(); 
-      std::string result = std::to_string(base_pose_array_.poses.size()) + " targets: ";
-      for (const auto& pose : base_pose_array_.poses) {
-          geometry_msgs::msg::PoseStamped target;
-          target.pose = pose;
-          arm.setGoal(target, "link_0"); 
-
-          auto plan_solution = arm.plan();
-          if (plan_solution) {
-              result += "Yes, ";
-              approachable_targets_.poses.push_back(pose); 
-          } else {
-              result += "No, ";
-          }
-      }
-      
-      if (!base_pose_array_.poses.empty()) {
-          result.pop_back(); 
-          result.pop_back();
-      }
-
-      RCLCPP_INFO(LOGGER, "%s", result.c_str());
+      RCLCPP_INFO(LOGGER, "arm.execute()");
+      arm.execute();
+    }*/
   }
 
 private:
   rclcpp::Node::SharedPtr node_;
+  std::shared_ptr<tf2_ros::Buffer> tfBuffer_;
+  tf2_ros::TransformListener tfListener_;
   rclcpp::Publisher<moveit_msgs::msg::DisplayRobotState>::SharedPtr robot_state_publisher_;
   moveit::planning_interface::MoveItCppPtr moveit_cpp_;
 
-  rclcpp::Subscription<geometry_msgs::msg::PoseArray>::SharedPtr pose_array_subscriber_;
-  geometry_msgs::msg::PoseArray base_pose_array_;
-  geometry_msgs::msg::PoseArray approachable_targets_;
-  tf2_ros::Buffer tfBuffer_;
-  tf2_ros::TransformListener tfListener_;
+  geometry_msgs::msg::PoseStamped transformPose(const geometry_msgs::msg::PoseStamped& input_pose, const std::string& target_frame)
+  {
+    geometry_msgs::msg::PoseStamped output_pose;
+
+    try
+    {
+      output_pose = tfBuffer_->transform(input_pose, target_frame, tf2::durationFromSec(0.1));
+      RCLCPP_INFO(node_->get_logger(), "Transformed Pose in frame [%s]: Position - x: [%f], y: [%f], z: [%f]; Orientation - x: [%f], y: [%f], z: [%f], w: [%f]", 
+            output_pose.header.frame_id.c_str(),
+            output_pose.pose.position.x, output_pose.pose.position.y, output_pose.pose.position.z,
+            output_pose.pose.orientation.x, output_pose.pose.orientation.y, output_pose.pose.orientation.z, output_pose.pose.orientation.w);
+    }
+    catch (tf2::TransformException &ex)
+    {
+      RCLCPP_ERROR(node_->get_logger(), "TF2 exception: %s", ex.what());
+    }
+
+    return output_pose;
+  }
 };
 
 int main(int argc, char** argv)
@@ -252,19 +194,15 @@ int main(int argc, char** argv)
   rclcpp::Node::SharedPtr node = rclcpp::Node::make_shared("run_moveit_cpp", "", node_options);
 
   MoveItCppDemo demo(node);
-  // std::thread run_demo([&demo]() {
-  //   // Let RViz initialize before running demo
-  //   // TODO (henningkayser): use lifecycle events to launch node
-  //   rclcpp::sleep_for(std::chrono::seconds(5));
-  //   demo.run();
-    
-  // });
+  std::thread run_demo([&demo]() {
+    // Let RViz initialize before running demo
+    // TODO(henningkayser): use lifecycle events to launch node
+    rclcpp::sleep_for(std::chrono::seconds(5));
+    demo.run();
+  });
 
   rclcpp::spin(node);
-  // run_demo.join();
+  run_demo.join();
 
   return 0;
 }
- 
-
- 

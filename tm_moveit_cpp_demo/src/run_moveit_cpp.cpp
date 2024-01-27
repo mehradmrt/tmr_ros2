@@ -86,7 +86,7 @@ public:
     geometry_msgs::msg::Pose box_pose;
     box_pose.position.x = 0.7;
     box_pose.position.y = 0.0;
-    box_pose.position.z = 0.9;
+    box_pose.position.z = 0.1;
 
     collision_object.primitives.push_back(box);
     collision_object.primitive_poses.push_back(box_pose);
@@ -98,9 +98,25 @@ public:
       scene->processCollisionObjectMsg(collision_object);
     }  // Unlock PlanningScene
 
-    // Set joint state goal
+    geometry_msgs::msg::PoseStamped p1;
+    p1.pose.position.x = 0.0;
+    p1.pose.position.y =-0.0;
+    p1.pose.position.z = 0.74;
+    p1.pose.orientation.x = 0.662247365964099;
+    p1.pose.orientation.y = 0.3039983947776145;
+    p1.pose.orientation.z = 0.2835538688334282;
+    p1.pose.orientation.w = 0.6233864016128692;
+    // p1.pose.orientation.w = 1.0;
+    p1.header.frame_id = "link_0";
+    p1.header.stamp = node_->get_clock()->now();
+
     RCLCPP_INFO(LOGGER, "Set goal");
-    arm.setGoal("ready1");
+    arm.setGoal(p1,"link_6");
+    // rclcpp::sleep_for(std::chrono::seconds(5));
+    
+    // Set joint state goal
+    // RCLCPP_INFO(LOGGER, "Set goal");
+    // arm.setGoal("ready1");
 
     // Run actual plan
     RCLCPP_INFO(LOGGER, "Plan to goal");
