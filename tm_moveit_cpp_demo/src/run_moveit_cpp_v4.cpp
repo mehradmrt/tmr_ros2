@@ -51,11 +51,10 @@
 #include <moveit_msgs/msg/display_robot_state.hpp>
 #include <trajectory_msgs/msg/joint_trajectory.hpp>
 
-
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
-
+#include <geometry_msgs/msg/pose_array.hpp>
 
 static const rclcpp::Logger LOGGER = rclcpp::get_logger("moveit_cpp_demo");
 
@@ -68,7 +67,8 @@ public:
     , tfListener_(*tfBuffer_)
     , robot_state_publisher_(node_->create_publisher<moveit_msgs::msg::DisplayRobotState>("display_robot_state", 1))
   {
-    // existing initialization code...
+    target_leaves_subscriber_ = node_->create_subscription<geometry_msgs::msg::PoseArray>(
+            "/target_leaves", 10, std::bind(&MoveItCppDemo::targetLeavesCallback, this, std::placeholders::_1));
   }
 
   void run()
@@ -115,32 +115,14 @@ public:
       scene->processCollisionObjectMsg(collision_object);
     }  // Unlock PlanningScene
 
-    geometry_msgs::msg::PoseStamped p1;
-    p1.pose.position.x = 0.1;
-    p1.pose.position.y = 0.1;
-    p1.pose.orientation.w = 1;
-    p1.header.frame_id = "link_6";
-    p1.header.stamp = node_->get_clock()->now();
-
-    geometry_msgs::msg::PoseStamped p2;
-    p2.pose.position.x = -0.1;
-    p2.pose.position.y = 0.1;
-    p2.pose.orientation.w = 1;
-    p2.header.frame_id = "link_6";
-    p2.header.stamp = node_->get_clock()->now();
-
-    // Transform p1 to link_0 frame
-    geometry_msgs::msg::PoseStamped p1_transformed = transformPose(p1, "link_0");
-    geometry_msgs::msg::PoseStamped p2_transformed = transformPose(p2, "link_0");
     
-    std::vector<geometry_msgs::msg::PoseStamped> points = {p1_transformed, p2_transformed};
-    std::vector<int> plan_outcomes(points.size(), 9);  // Initialize with 0s
+    std::vector<int> plan_outcomes(target_poses_.size(), 9);  
     std::string outcome_log = "Planning outcomes for all points:\n";
 
-    for (size_t i = 0; i < points.size(); ++i)
+    for (size_t i = 0; i < target_poses_.size(); ++i)
     {
       RCLCPP_INFO(LOGGER, "Setting goal for point %zu", i);
-      arm.setGoal(points[i], "link_6");
+      arm.setGoal(target_poses_[i], "link_6");
 
       RCLCPP_INFO(LOGGER, "Planning to goal for point %zu", i);
       auto plan_solution = arm.plan();
@@ -176,12 +158,31 @@ public:
     RCLCPP_INFO(LOGGER, "%s", outcome_log.c_str());
   }
 
+  void processNewData()
+  {
+      if (packages_received_)
+      {
+          run();
+          packages_received_ = false;
+      }
+      else
+      {
+      RCLCPP_INFO(LOGGER, "waiting for the targets to be available.....");
+      rclcpp::sleep_for(std::chrono::seconds(1));
+      }
+  }
+
 private:
   rclcpp::Node::SharedPtr node_;
   std::shared_ptr<tf2_ros::Buffer> tfBuffer_;
   tf2_ros::TransformListener tfListener_;
   rclcpp::Publisher<moveit_msgs::msg::DisplayRobotState>::SharedPtr robot_state_publisher_;
   moveit::planning_interface::MoveItCppPtr moveit_cpp_;
+  
+  rclcpp::Subscription<geometry_msgs::msg::PoseArray>::SharedPtr target_leaves_subscriber_;
+  std::vector<geometry_msgs::msg::PoseStamped> target_poses_;
+
+  bool packages_received_ = false;
 
   geometry_msgs::msg::PoseStamped transformPose(const geometry_msgs::msg::PoseStamped& input_pose, const std::string& target_frame)
   {
@@ -202,6 +203,25 @@ private:
 
     return output_pose;
   }
+
+  void targetLeavesCallback(const geometry_msgs::msg::PoseArray::SharedPtr msg)
+  { 
+    target_poses_.clear();
+    std::vector<geometry_msgs::msg::PoseStamped> target_poses;
+    for (const auto& pose : msg->poses)
+    {
+      geometry_msgs::msg::PoseStamped pose_stamped;
+      pose_stamped.pose = pose;
+      pose_stamped.header.frame_id = "link_6";
+      pose_stamped.header.stamp = node_->get_clock()->now();
+
+      auto transformed_pose = transformPose(pose_stamped, "link_0");
+      target_poses_.push_back(transformed_pose);
+    }
+
+    packages_received_ = true;
+  }
+
 };
 
 int main(int argc, char** argv)
@@ -216,15 +236,10 @@ int main(int argc, char** argv)
   rclcpp::Node::SharedPtr node = rclcpp::Node::make_shared("run_moveit_cpp", "", node_options);
 
   MoveItCppDemo demo(node);
-  std::thread run_demo([&demo]() {
-    // Let RViz initialize before running demo
-    // TODO(henningkayser): use lifecycle events to launch node
-    rclcpp::sleep_for(std::chrono::seconds(5));
-    demo.run();
-  });
-
-  rclcpp::spin(node);
-  run_demo.join();
-
+  while (rclcpp::ok()) {
+        rclcpp::spin_some(node);
+        demo.processNewData();
+        std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Small sleep to prevent busy waiting
+    }
   return 0;
 }

@@ -141,4 +141,6 @@ def generate_launch_description():
         )
     '''
 
-    return LaunchDescription([ tm_driver_node, static_tf, robot_state_publisher, rviz_node, run_moveit_cpp_node ])
+    return LaunchDescription([ tm_driver_node, static_tf, robot_state_publisher,
+                            #    rviz_node,
+                                run_moveit_cpp_node ])
