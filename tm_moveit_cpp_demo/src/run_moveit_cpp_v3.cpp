@@ -237,9 +237,6 @@ public:
   }
 
 
-  
-
-
 private:
   rclcpp::Node::SharedPtr node_;
   std::shared_ptr<tf2_ros::Buffer> tfBuffer_;
