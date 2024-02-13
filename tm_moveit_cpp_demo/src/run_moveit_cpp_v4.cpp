@@ -122,7 +122,7 @@ public:
     for (size_t i = 0; i < target_poses_.size(); ++i)
     {
       RCLCPP_INFO(LOGGER, "Setting goal for point %zu", i);
-      arm.setGoal(target_poses_[i], "link_6");
+      arm.setGoal(target_poses_[i], "gripper");
 
       RCLCPP_INFO(LOGGER, "Planning to goal for point %zu", i);
       auto plan_solution = arm.plan();
@@ -212,7 +212,7 @@ private:
     {
       geometry_msgs::msg::PoseStamped pose_stamped;
       pose_stamped.pose = pose;
-      pose_stamped.header.frame_id = "link_6";
+      pose_stamped.header.frame_id = "gripper";
       pose_stamped.header.stamp = node_->get_clock()->now();
 
       auto transformed_pose = transformPose(pose_stamped, "link_0");
@@ -243,3 +243,4 @@ int main(int argc, char** argv)
     }
   return 0;
 }
+ 

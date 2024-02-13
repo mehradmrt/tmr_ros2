@@ -282,6 +282,13 @@
     <child link="${prefix}flange" />
     <origin rpy="0.000000 0.000000 0.000000" xyz="0.000000 0.000000 0.000000" />
   </joint>
+  <link name="${prefix}gripper" />
+  <joint name="${prefix}gripper_joint" type="fixed">
+    <parent link="${prefix}link_6" />
+    <child link="${prefix}gripper" />
+    <origin rpy="0.000000 0.000000 0.000000" xyz="0.000000 0.000000 0.215" />
+  </joint>
+
 <!--LinkDescription-->
 
   </xacro:macro>

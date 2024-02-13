@@ -2,17 +2,17 @@
  *  run_moveit_cpp.cpp
  * 
  *  Various portions of the code are based on original source from 
- *  PickNik Inc.
+ *  PickNik Inc
+ *
+ *  Redistribution and use in source and binary forms, with or without
+ *  modificat.
  *  and are used in accordance with the following license. */
 
 /*********************************************************************
  * Software License Agreement (BSD License)
  *
  *  Copyright (c) 2020, PickNik Inc.
- *  All rights reserved.
- *
- *  Redistribution and use in source and binary forms, with or without
- *  modification, are permitted provided that the following conditions
+ *  All rights reserved.ion, are permitted provided that the following conditions
  *  are met:
  *
  *   * Redistributions of source code must retain the above copyright
@@ -51,11 +51,9 @@
 #include <moveit_msgs/msg/display_robot_state.hpp>
 #include <trajectory_msgs/msg/joint_trajectory.hpp>
 
-
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
-
 
 static const rclcpp::Logger LOGGER = rclcpp::get_logger("moveit_cpp_demo");
 
@@ -116,23 +114,35 @@ public:
     }  // Unlock PlanningScene
 
     geometry_msgs::msg::PoseStamped p1;
-    p1.pose.position.x = 0.1;
-    p1.pose.position.y = 0.1;
-    p1.pose.orientation.w = 1;
-    p1.header.frame_id = "link_6";
+    p1.pose.position.x = 0.200;
+    p1.pose.position.y = -0.1110;
+    p1.pose.position.z = 0.810;
+    p1.pose.orientation.x = 0.50;
+    p1.pose.orientation.y = 0.50;
+    p1.pose.orientation.z = 0.50;
+    p1.pose.orientation.w = 0.50;
+    p1.header.frame_id = "link_0";
     p1.header.stamp = node_->get_clock()->now();
 
     geometry_msgs::msg::PoseStamped p2;
-    p2.pose.position.x = -0.1;
-    p2.pose.position.y = 0.1;
+    p2.pose.position.x =  0.0;
+    p2.pose.position.y =  -0.05;
     p2.pose.orientation.w = 1;
-    p2.header.frame_id = "link_6";
+    p2.header.frame_id = "gripper";
     p2.header.stamp = node_->get_clock()->now();
+
+    geometry_msgs::msg::PoseStamped p3;
+    p3.pose.position.x =  0.0;
+    p3.pose.position.y =  0.05;
+    p3.pose.orientation.w = 1;
+    p3.header.frame_id = "gripper";
+    p3.header.stamp = node_->get_clock()->now();
 
     // Transform p1 to link_0 frame
     geometry_msgs::msg::PoseStamped p1_transformed = transformPose(p1, "link_0");
     geometry_msgs::msg::PoseStamped p2_transformed = transformPose(p2, "link_0");
-    
+    geometry_msgs::msg::PoseStamped p3_transformed = transformPose(p3, "link_0");
+
     std::vector<geometry_msgs::msg::PoseStamped> points = {p1_transformed, p2_transformed};
     std::vector<int> plan_outcomes(points.size(), 9);  // Initialize with 0s
     std::string outcome_log = "Planning outcomes for all points:\n";
@@ -140,8 +150,7 @@ public:
     for (size_t i = 0; i < points.size(); ++i)
     {
       RCLCPP_INFO(LOGGER, "Setting goal for point %zu", i);
-      arm.setGoal(points[i], "link_6");
-
+      arm.setGoal(points[i], "gripper");      
       RCLCPP_INFO(LOGGER, "Planning to goal for point %zu", i);
       auto plan_solution = arm.plan();
 
@@ -151,13 +160,33 @@ public:
         plan_outcomes[i] = 1;  
         outcome_log += "Point " + std::to_string(i) + ": Success\n";
         arm.execute();
+        
+        bool goalReached = false;
+        while (rclcpp::ok()) 
+        {
+          if (PoseCompare("gripper", "link_0", points[i], 0.001)) 
+          { 
+            RCLCPP_INFO(LOGGER, "Gripper reached the goal for point %zu.", i);
+            goalReached = true;
+            rclcpp::sleep_for(std::chrono::seconds(3));
+            break;
+          } 
+          else 
+          {
+            RCLCPP_INFO(LOGGER, "Gripper has not reach the goal for point %zu yet.", i);
+            rclcpp::sleep_for(std::chrono::seconds(3));
+          }
+          
+        }
+
+        rclcpp::sleep_for(std::chrono::seconds(3));
 
         arm.setGoal(*robot_first_state);
         auto return_plan_solution = arm.plan();
         if (return_plan_solution)
         {
-            RCLCPP_INFO(LOGGER, "Returning to initial state.");
-            arm.execute();
+          RCLCPP_INFO(LOGGER, "Returning to initial state.");
+          moveit_cpp_->execute("tmr_arm", return_plan_solution.trajectory, true);
         }
         else
         {
@@ -175,6 +204,41 @@ public:
     }
     RCLCPP_INFO(LOGGER, "%s", outcome_log.c_str());
   }
+
+  
+  bool PoseCompare(const std::string& target_frame, const std::string& reference_frame, const geometry_msgs::msg::PoseStamped& goal_pose, double position_tolerance) {
+      geometry_msgs::msg::PoseStamped current_pose;
+      try {
+          auto transformStamped = tfBuffer_->lookupTransform(reference_frame, target_frame, tf2::TimePointZero, tf2::durationFromSec(0.1));
+          current_pose.header.stamp = node_->get_clock()->now();
+          current_pose.header.frame_id = reference_frame;
+          current_pose.pose.position.x = transformStamped.transform.translation.x;
+          current_pose.pose.position.y = transformStamped.transform.translation.y;
+          current_pose.pose.position.z = transformStamped.transform.translation.z;
+      } catch (tf2::TransformException& ex) {
+          RCLCPP_WARN(node_->get_logger(), "Could not get current pose: %s", ex.what());
+          return false;
+      }
+
+      double dx = current_pose.pose.position.x - goal_pose.pose.position.x;
+      double dy = current_pose.pose.position.y - goal_pose.pose.position.y;
+      double dz = current_pose.pose.position.z - goal_pose.pose.position.z;
+      double distance = std::sqrt(dx * dx + dy * dy + dz * dz);
+
+      if (distance > position_tolerance) 
+      {
+          RCLCPP_INFO(node_->get_logger(), "Position tolerance is not reached: %f > %f", distance, position_tolerance);
+          return false; 
+      }
+      else
+      {
+      return true;
+      }
+  }
+
+
+  
+
 
 private:
   rclcpp::Node::SharedPtr node_;
@@ -202,6 +266,7 @@ private:
 
     return output_pose;
   }
+  
 };
 
 int main(int argc, char** argv)
@@ -228,3 +293,4 @@ int main(int argc, char** argv)
 
   return 0;
 }
+ 
