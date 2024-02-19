@@ -115,9 +115,35 @@ public:
       scene->processCollisionObjectMsg(collision_object);
     }  // Unlock PlanningScene
 
-    
     std::vector<int> plan_outcomes(target_poses_.size(), 9);  
     std::string outcome_log = "Planning outcomes for all points:\n";
+
+    arm.setGoal("home2");
+    RCLCPP_INFO(LOGGER, "Plan to home2");
+    auto home_solution = arm.plan();
+    if (home_solution)
+    {
+      RCLCPP_INFO(LOGGER, "Executing movement to 'home2'");
+      arm.execute();
+
+      RCLCPP_INFO(LOGGER, "Waiting for robot to reach 'home2'...");
+      bool HomeReached = false;
+
+      while (rclcpp::ok())
+      { 
+        auto robot_state = moveit_cpp_->getCurrentState();
+        if (isRobotHome(robot_state, "home2")) 
+        { 
+          RCLCPP_INFO(LOGGER, "Robot has reached 'home2' position.");
+          HomeReached = true;
+          break;
+        } 
+        else 
+        {
+          rclcpp::sleep_for(std::chrono::seconds(2));
+        }
+      }
+    }
 
     for (size_t i = 0; i < target_poses_.size(); ++i)
     {
@@ -133,18 +159,65 @@ public:
         plan_outcomes[i] = 1;  
         outcome_log += "Point " + std::to_string(i) + ": Success\n";
         arm.execute();
+        bool goalReached = false;
+        while (rclcpp::ok())
+        {
+          if (PoseCompare("gripper", "link_0", target_poses_[i], 0.001, 0.005)) 
+          { 
+            RCLCPP_INFO(LOGGER, "Gripper reached the goal for point %zu.", i);
+            goalReached = true;
+            rclcpp::sleep_for(std::chrono::seconds(3));
+            break;
+          } 
+          else 
+          {
+            RCLCPP_INFO(LOGGER, "Gripper has not reach the goal for point %zu yet.", i);
+            rclcpp::sleep_for(std::chrono::seconds(3));
+          }
+          
+        }
 
-        arm.setGoal(*robot_first_state);
-        auto return_plan_solution = arm.plan();
-        if (return_plan_solution)
+        rclcpp::sleep_for(std::chrono::seconds(3));
+
+        arm.setGoal("home2");
+        RCLCPP_INFO(LOGGER, "Plan to home2");
+        auto home_solution = arm.plan();
+        if (home_solution)
         {
-            RCLCPP_INFO(LOGGER, "Returning to initial state.");
-            arm.execute();
+          RCLCPP_INFO(LOGGER, "Executing movement to 'home2'");
+          arm.execute();
+
+          RCLCPP_INFO(LOGGER, "Waiting for robot to reach 'home2'...");
+          bool HomeReached = false;
+
+          while (rclcpp::ok())
+          { 
+            auto robot_state = moveit_cpp_->getCurrentState();
+            if (isRobotHome(robot_state, "home2")) 
+            { 
+              RCLCPP_INFO(LOGGER, "Robot has reached 'home2' position.");
+              HomeReached = true;
+              break;
+            } 
+            else 
+            {
+              rclcpp::sleep_for(std::chrono::seconds(2));
+            }
+          }
         }
-        else
-        {
-            RCLCPP_WARN(LOGGER, "Failed to plan back to initial state.");
-        }
+
+        // arm.setGoal(*robot_first_state);
+        // auto return_plan_solution = arm.plan();
+        // if (return_plan_solution)
+        // {
+        //   RCLCPP_INFO(LOGGER, "Returning to initial state.");
+        //   arm.execute();
+        //   rclcpp::sleep_for(std::chrono::seconds(3));
+        // }
+        // else
+        // {
+        //     RCLCPP_WARN(LOGGER, "Failed to plan back to initial state.");
+        // }
       }
       else
       {
@@ -153,9 +226,70 @@ public:
         outcome_log += "Point " + std::to_string(i) + ": Failure\n";
       }
       
-      rclcpp::sleep_for(std::chrono::seconds(2));
+      rclcpp::sleep_for(std::chrono::seconds(3));
     }
     RCLCPP_INFO(LOGGER, "%s", outcome_log.c_str());
+  }
+
+
+  bool PoseCompare(const std::string& target_frame, const std::string& reference_frame, const geometry_msgs::msg::PoseStamped& goal_pose, double position_tolerance, double orientation_tolerance) 
+  {
+    geometry_msgs::msg::PoseStamped current_pose;
+    try {
+        auto transformStamped = tfBuffer_->lookupTransform(reference_frame, target_frame, tf2::TimePointZero, tf2::durationFromSec(0.1));
+        current_pose.header.stamp = node_->get_clock()->now();
+        current_pose.header.frame_id = reference_frame;
+        current_pose.pose.position.x = transformStamped.transform.translation.x;
+        current_pose.pose.position.y = transformStamped.transform.translation.y;
+        current_pose.pose.position.z = transformStamped.transform.translation.z;
+        current_pose.pose.orientation = transformStamped.transform.rotation;
+    } catch (tf2::TransformException& ex) {
+        RCLCPP_WARN(node_->get_logger(), "Could not get current pose: %s", ex.what());
+        return false;
+    }
+
+    double dx = current_pose.pose.position.x - goal_pose.pose.position.x;
+    double dy = current_pose.pose.position.y - goal_pose.pose.position.y;
+    double dz = current_pose.pose.position.z - goal_pose.pose.position.z;
+    double distance = std::sqrt(dx * dx + dy * dy + dz * dz);
+
+    tf2::Quaternion current_orientation, goal_orientation;
+    tf2::fromMsg(current_pose.pose.orientation, current_orientation);
+    tf2::fromMsg(goal_pose.pose.orientation, goal_orientation);
+    double angle_diff = current_orientation.angleShortestPath(goal_orientation);
+
+    if (distance > position_tolerance || angle_diff > orientation_tolerance) {
+        RCLCPP_INFO(node_->get_logger(), "Tolerance not reached. Position: %f > %f, Orientation: %f > %f", distance, position_tolerance, angle_diff, orientation_tolerance);
+        return false;
+    }
+
+    return true;
+  }
+
+  bool isRobotHome(const moveit::core::RobotStatePtr& robot_state, const std::string& home_position_name) {
+      const std::string group_name = "tmr_arm";
+      const auto* joint_model_group = robot_state->getJointModelGroup(group_name);
+      double tolerance = 0.0005;
+      
+      std::map<std::string, double> target_positions;
+      joint_model_group->getVariableDefaultPositions(home_position_name, target_positions);
+
+      std::vector<double> diffs;
+      diffs.clear();
+      for (const auto& joint_target : target_positions) {
+          double current_position = *robot_state->getJointPositions(joint_target.first);
+          diffs.push_back(current_position - joint_target.second);
+      }
+
+      double total_difference = std::sqrt(std::inner_product(diffs.begin(), diffs.end(), diffs.begin(), 0.0));
+
+      if (total_difference <= tolerance) {
+          RCLCPP_INFO(node_->get_logger(), "Robot is at '%s' position within a tolerance of %f.", home_position_name.c_str(), tolerance);
+          return true;
+      } else {
+          RCLCPP_INFO(node_->get_logger(), "Robot is not at '%s' position, tolerance exceeded: %f > %f", home_position_name.c_str(), total_difference, tolerance);
+          return false;
+      }
   }
 
   void processNewData()
@@ -239,7 +373,7 @@ int main(int argc, char** argv)
   while (rclcpp::ok()) {
         rclcpp::spin_some(node);
         demo.processNewData();
-        std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Small sleep to prevent busy waiting
+        std::this_thread::sleep_for(std::chrono::seconds(3)); 
     }
   return 0;
 }
