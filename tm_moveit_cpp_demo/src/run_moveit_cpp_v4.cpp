@@ -135,12 +135,13 @@ public:
         if (isRobotHome(robot_state, "home2")) 
         { 
           RCLCPP_INFO(LOGGER, "Robot has reached 'home2' position.");
+          rclcpp::sleep_for(std::chrono::seconds(3));
           HomeReached = true;
           break;
         } 
         else 
         {
-          rclcpp::sleep_for(std::chrono::seconds(2));
+          rclcpp::sleep_for(std::chrono::seconds(3));
         }
       }
     }
@@ -162,11 +163,11 @@ public:
         bool goalReached = false;
         while (rclcpp::ok())
         {
-          if (PoseCompare("gripper", "link_0", target_poses_[i], 0.001, 0.005)) 
+          if (PoseCompare("gripper", "link_0", target_poses_[i], 0.001, 0.05)) 
           { 
             RCLCPP_INFO(LOGGER, "Gripper reached the goal for point %zu.", i);
             goalReached = true;
-            rclcpp::sleep_for(std::chrono::seconds(3));
+            rclcpp::sleep_for(std::chrono::seconds(10));
             break;
           } 
           else 
@@ -196,12 +197,13 @@ public:
             if (isRobotHome(robot_state, "home2")) 
             { 
               RCLCPP_INFO(LOGGER, "Robot has reached 'home2' position.");
+              rclcpp::sleep_for(std::chrono::seconds(3));
               HomeReached = true;
               break;
             } 
             else 
             {
-              rclcpp::sleep_for(std::chrono::seconds(2));
+              rclcpp::sleep_for(std::chrono::seconds(3));
             }
           }
         }
@@ -258,18 +260,23 @@ public:
     tf2::fromMsg(goal_pose.pose.orientation, goal_orientation);
     double angle_diff = current_orientation.angleShortestPath(goal_orientation);
 
-    if (distance > position_tolerance || angle_diff > orientation_tolerance) {
-        RCLCPP_INFO(node_->get_logger(), "Tolerance not reached. Position: %f > %f, Orientation: %f > %f", distance, position_tolerance, angle_diff, orientation_tolerance);
-        return false;
+    if (distance < position_tolerance && angle_diff < orientation_tolerance) {
+        RCLCPP_INFO(node_->get_logger(), "Tolerance reached.");
+        return true;
+    }
+    else
+    {
+      RCLCPP_INFO(node_->get_logger(), "Tolerance not reached. Position: %f > %f, Orientation: %f > %f", distance, position_tolerance, angle_diff, orientation_tolerance);
+      return false;
     }
 
-    return true;
+    
   }
 
   bool isRobotHome(const moveit::core::RobotStatePtr& robot_state, const std::string& home_position_name) {
       const std::string group_name = "tmr_arm";
       const auto* joint_model_group = robot_state->getJointModelGroup(group_name);
-      double tolerance = 0.0005;
+      double tolerance = 0.002;
       
       std::map<std::string, double> target_positions;
       joint_model_group->getVariableDefaultPositions(home_position_name, target_positions);
@@ -283,7 +290,7 @@ public:
 
       double total_difference = std::sqrt(std::inner_product(diffs.begin(), diffs.end(), diffs.begin(), 0.0));
 
-      if (total_difference <= tolerance) {
+      if (total_difference < tolerance) {
           RCLCPP_INFO(node_->get_logger(), "Robot is at '%s' position within a tolerance of %f.", home_position_name.c_str(), tolerance);
           return true;
       } else {

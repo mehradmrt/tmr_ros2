@@ -372,7 +372,7 @@ int main(int argc, char** argv)
   std::thread run_demo([&demo]() {
     // Let RViz initialize before running demo
     // TODO(henningkayser): use lifecycle events to launch node
-    rclcpp::sleep_for(std::chrono::seconds(5));
+    rclcpp::sleep_for(std::chrono::seconds(10));
     demo.run();
   });
 

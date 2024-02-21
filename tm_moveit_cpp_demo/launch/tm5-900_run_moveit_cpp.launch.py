@@ -49,7 +49,7 @@ def generate_launch_description():
         os.path.join(
             get_package_share_directory("tm_description"),
             "xacro",
-            "tm5-900.urdf.xacro",
+            "tm5-900-mod.urdf.xacro",
         )
     )                                                    
     robot_description = {"robot_description": robot_description_config.toxml()}
