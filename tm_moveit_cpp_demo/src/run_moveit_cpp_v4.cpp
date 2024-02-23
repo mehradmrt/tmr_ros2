@@ -80,6 +80,7 @@ public:
 
     RCLCPP_INFO(LOGGER, "Initialize PlanningComponent");
     moveit::planning_interface::PlanningComponent arm("tmr_arm", moveit_cpp_);
+    
 
     // auto planning_components = std::make_shared<moveit_cpp::PlanningComponent>("tmr_arm", moveit_cpp_);
     auto robot_first_state = moveit_cpp_->getCurrentState();
@@ -97,7 +98,7 @@ public:
     box.dimensions = { 1.0, 0.8, 0.4 };
 
     tf2::Quaternion quat;
-    quat.setRPY(0, 0, -M_PI / 4);  // Rotate -45 degrees around Z-axis
+    quat.setRPY(0, 0, 0);  // quat.setRPY(0, 0, -M_PI / 4); Rotate -45 degrees around Z-axis
 
     geometry_msgs::msg::Pose box_pose;
     box_pose.position.x = -0.25;  

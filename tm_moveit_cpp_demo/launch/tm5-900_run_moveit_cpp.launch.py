@@ -71,7 +71,7 @@ def generate_launch_description():
     ompl_planning_yaml = load_yaml('tm_moveit_config_tm5-900', 'config/ompl_planning.yaml')
     ompl_planning_pipeline_config['ompl'].update(ompl_planning_yaml)
 
-    # MoveItCpp demo executable
+    # MoveItCpp demo executable  
     run_moveit_cpp_node = Node(
         package='tm_moveit_cpp_demo',
         # TODO(henningkayser): add debug argument
