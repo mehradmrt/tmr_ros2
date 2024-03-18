@@ -112,7 +112,6 @@ public:
     collision_object.primitive_poses.push_back(box_pose);
     collision_object.operation = collision_object.ADD;
 
-
     // Add object to planning scene
     {  // Lock PlanningScene
       planning_scene_monitor::LockedPlanningSceneRW scene(moveit_cpp_->getPlanningSceneMonitor());
@@ -121,6 +120,26 @@ public:
 
     std::vector<int> plan_outcomes(target_poses_.size(), 9);  
     std::string outcome_log = "Planning outcomes for all points:\n";
+    for (size_t i = 0; i < target_poses_.size(); ++i)
+    {
+      moveit_msgs::msg::CollisionObject collision_leaf;
+      collision_leaf.header.frame_id = "link_0";
+      collision_leaf.id = "leaf_" + std::to_string(i);
+
+      shape_msgs::msg::SolidPrimitive leaf_box;
+      leaf_box.type = leaf_box.BOX;
+      leaf_box.dimensions = { 0.01, 0.1, 0.05 };
+
+      geometry_msgs::msg::Pose leaf_box_pose = target_poses_[i].pose; 
+
+      collision_leaf.primitives.push_back(leaf_box);
+      collision_leaf.primitive_poses.push_back(leaf_box_pose);
+      collision_leaf.operation = collision_leaf.ADD;
+      {  
+        planning_scene_monitor::LockedPlanningSceneRW scene(moveit_cpp_->getPlanningSceneMonitor());
+        scene->processCollisionObjectMsg(collision_leaf);
+      }   
+    }
 
     arm.setGoal("home2");
     RCLCPP_INFO(LOGGER, "Plan to home2");
@@ -152,24 +171,6 @@ public:
 
     for (size_t i = 0; i < target_poses_.size(); ++i)
     {
-      moveit_msgs::msg::CollisionObject collision_leaf;
-      collision_leaf.header.frame_id = "link_0";
-      collision_leaf.id = "leaf_" + std::to_string(i);
-
-      shape_msgs::msg::SolidPrimitive leaf_box;
-      leaf_box.type = leaf_box.BOX;
-      leaf_box.dimensions = { 0.01, 0.1, 0.05 };
-
-      geometry_msgs::msg::Pose leaf_box_pose = target_poses_[i].pose; 
-
-      collision_leaf.primitives.push_back(leaf_box);
-      collision_leaf.primitive_poses.push_back(leaf_box_pose);
-      collision_leaf.operation = collision_leaf.ADD;
-      {  
-        planning_scene_monitor::LockedPlanningSceneRW scene(moveit_cpp_->getPlanningSceneMonitor());
-        scene->processCollisionObjectMsg(collision_leaf);
-      }   
-
       RCLCPP_INFO(LOGGER, "Setting goal for point %zu", i);
       arm.setGoal(target_poses_[i], "gripper");
 
@@ -200,41 +201,35 @@ public:
           
         }
 
-        collision_leaf.operation = collision_leaf.REMOVE;
-        {  
-          planning_scene_monitor::LockedPlanningSceneRW scene(moveit_cpp_->getPlanningSceneMonitor());
-          scene->processCollisionObjectMsg(collision_leaf);
-        } 
-
         rclcpp::sleep_for(std::chrono::seconds(3));
 
-        arm.setGoal("home2");
-        RCLCPP_INFO(LOGGER, "Plan to home2");
-        auto home_solution = arm.plan();
-        if (home_solution)
-        {
-          RCLCPP_INFO(LOGGER, "Executing movement to 'home2'");
-          arm.execute();
+        // arm.setGoal("home2");
+        // RCLCPP_INFO(LOGGER, "Plan to home2");
+        // auto home_solution = arm.plan();
+        // if (home_solution)
+        // {
+        //   RCLCPP_INFO(LOGGER, "Executing movement to 'home2'");
+        //   arm.execute();
 
-          RCLCPP_INFO(LOGGER, "Waiting for robot to reach 'home2'...");
-          bool HomeReached = false;
+        //   RCLCPP_INFO(LOGGER, "Waiting for robot to reach 'home2'...");
+        //   bool HomeReached = false;
 
-          while (rclcpp::ok())
-          { 
-            auto robot_state = moveit_cpp_->getCurrentState();
-            if (isRobotHome(robot_state, "home2")) 
-            { 
-              RCLCPP_INFO(LOGGER, "Robot has reached 'home2' position.");
-              rclcpp::sleep_for(std::chrono::seconds(3));
-              HomeReached = true;
-              break;
-            } 
-            else 
-            {
-              rclcpp::sleep_for(std::chrono::seconds(3));
-            }
-          }
-        }
+        //   while (rclcpp::ok())
+        //   { 
+        //     auto robot_state = moveit_cpp_->getCurrentState();
+        //     if (isRobotHome(robot_state, "home2")) 
+        //     { 
+        //       RCLCPP_INFO(LOGGER, "Robot has reached 'home2' position.");
+        //       rclcpp::sleep_for(std::chrono::seconds(3));
+        //       HomeReached = true;
+        //       break;
+        //     } 
+        //     else 
+        //     {
+        //       rclcpp::sleep_for(std::chrono::seconds(3));
+        //     }
+        //   }
+        // }
 
         // arm.setGoal(*robot_first_state);
         // auto return_plan_solution = arm.plan();
