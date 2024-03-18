@@ -64,6 +64,11 @@ def generate_launch_description():
     moveit_controllers = { 'moveit_simple_controller_manager' : controllers_yaml,
                            'moveit_controller_manager': 'moveit_simple_controller_manager/MoveItSimpleControllerManager'}
 
+    # octomap_config = {'octomap_frame': 'camera_link', 
+    #                   'octomap_resolution': 0.05,
+    #                   'max_range': 2.0}
+    # octomap_updater_config = load_yaml('tm_moveit_config_tm5-900', 'config/sensors_3d.yaml')                      
+
     ompl_planning_pipeline_config = { 'ompl' : {
         'planning_plugin' : 'ompl_interface/OMPLPlanner',
         'request_adapters' : """default_planner_request_adapters/AddTimeOptimalParameterization default_planner_request_adapters/FixWorkspaceBounds default_planner_request_adapters/FixStartStateBounds default_planner_request_adapters/FixStartStateCollision default_planner_request_adapters/FixStartStatePathConstraints""" ,
@@ -85,7 +90,10 @@ def generate_launch_description():
             robot_description_semantic,
             kinematics_yaml,
             ompl_planning_pipeline_config,
-            moveit_controllers]
+            moveit_controllers,
+            # octomap_config,
+            # octomap_updater_config
+            ]
         )
 
     # RViz
@@ -142,5 +150,5 @@ def generate_launch_description():
     '''
 
     return LaunchDescription([ tm_driver_node, static_tf, robot_state_publisher,
-                            #    rviz_node,
+                               rviz_node,
                                 run_moveit_cpp_node ])

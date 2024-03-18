@@ -290,6 +290,13 @@
     <child link="${prefix}gripper" />
     <origin rpy="0.000000 0.000000 0.000000" xyz="0.000000 0.000000 0.230" />
   </joint>
+  <link name="${prefix}camera_link" />
+  <joint name="${prefix}camera_joint" type="fixed">
+    <parent link="${prefix}link_6" />
+    <child link="${prefix}camera_link" />
+    <origin rpy="0.000000 -1.5707 -1.5707" xyz="0.0175 0.1243 0.01933" />
+  </joint>
+
 
 <!--LinkDescription-->
 

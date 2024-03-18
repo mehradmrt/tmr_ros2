@@ -17,4 +17,6 @@ run_moveit_cpp:
       planning_attempts: 10
       planning_pipeline: ompl
       max_velocity_scaling_factor: 1.0
-      max_acceleration_scaling_factor: 1.0
+      max_acceleration_scaling_factor: 0.05
+      # planner_id: "LazyPRMstar"
+      # planning_time: 2.0

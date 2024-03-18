@@ -45,6 +45,7 @@
 
 #include <thread>
 #include <rclcpp/rclcpp.hpp>
+
 #include <moveit/moveit_cpp/moveit_cpp.h>
 #include <moveit/moveit_cpp/planning_component.h>
 #include <moveit/robot_state/conversions.h>
@@ -55,6 +56,7 @@
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
 #include <geometry_msgs/msg/pose_array.hpp>
+
 
 static const rclcpp::Logger LOGGER = rclcpp::get_logger("moveit_cpp_demo");
 
@@ -102,13 +104,14 @@ public:
 
     geometry_msgs::msg::Pose box_pose;
     box_pose.position.x = -0.25;  
-    box_pose.position.y = 0.25;
-    box_pose.position.z = -0.2;
+    box_pose.position.y = 0.0; //0.25;
+    box_pose.position.z = -0.15;
     box_pose.orientation = tf2::toMsg(quat);
- 
+
     collision_object.primitives.push_back(box);
     collision_object.primitive_poses.push_back(box_pose);
     collision_object.operation = collision_object.ADD;
+
 
     // Add object to planning scene
     {  // Lock PlanningScene
@@ -149,6 +152,24 @@ public:
 
     for (size_t i = 0; i < target_poses_.size(); ++i)
     {
+      moveit_msgs::msg::CollisionObject collision_leaf;
+      collision_leaf.header.frame_id = "link_0";
+      collision_leaf.id = "leaf_" + std::to_string(i);
+
+      shape_msgs::msg::SolidPrimitive leaf_box;
+      leaf_box.type = leaf_box.BOX;
+      leaf_box.dimensions = { 0.01, 0.1, 0.05 };
+
+      geometry_msgs::msg::Pose leaf_box_pose = target_poses_[i].pose; 
+
+      collision_leaf.primitives.push_back(leaf_box);
+      collision_leaf.primitive_poses.push_back(leaf_box_pose);
+      collision_leaf.operation = collision_leaf.ADD;
+      {  
+        planning_scene_monitor::LockedPlanningSceneRW scene(moveit_cpp_->getPlanningSceneMonitor());
+        scene->processCollisionObjectMsg(collision_leaf);
+      }   
+
       RCLCPP_INFO(LOGGER, "Setting goal for point %zu", i);
       arm.setGoal(target_poses_[i], "gripper");
 
@@ -178,6 +199,12 @@ public:
           }
           
         }
+
+        collision_leaf.operation = collision_leaf.REMOVE;
+        {  
+          planning_scene_monitor::LockedPlanningSceneRW scene(moveit_cpp_->getPlanningSceneMonitor());
+          scene->processCollisionObjectMsg(collision_leaf);
+        } 
 
         rclcpp::sleep_for(std::chrono::seconds(3));
 
@@ -380,8 +407,9 @@ int main(int argc, char** argv)
   MoveItCppDemo demo(node);
   while (rclcpp::ok()) {
         rclcpp::spin_some(node);
+        // std::this_thread::sleep_for(std::chrono::seconds(8)); 
         demo.processNewData();
-        std::this_thread::sleep_for(std::chrono::seconds(3)); 
+        std::this_thread::sleep_for(std::chrono::seconds(5)); 
     }
   return 0;
 }
