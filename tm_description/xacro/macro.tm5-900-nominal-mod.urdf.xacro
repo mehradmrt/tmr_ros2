@@ -255,10 +255,13 @@
   <link name="${prefix}link_6">
     <visual>
       <geometry>
-        <mesh filename="package://tm_description/meshes/tm5-900/visual/tmr_ee.${format}" />
-        <!-- <mesh filename="package://tm_description/meshes/tm5-900/visual/urdf_link6_modified.STL"/> -->
+        <!-- <mesh filename="package://tm_description/meshes/tm5-900/visual/tmr_ee.${format}" /> -->
+        <mesh filename="package://tm_description/meshes/tm5-900/visual/urdf_link6_modified.STL"/>
       </geometry>
-      <material name="${color}" />
+      <material name="gray">
+          <color rgba="0.5 0.5 0.5 1.0"/>
+      </material>
+      <!-- <material name="${color}" /> -->
     </visual>
     <collision>
       <geometry>

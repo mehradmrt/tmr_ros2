@@ -97,7 +97,7 @@ def generate_launch_description():
         )
 
     # RViz
-    rviz_config_file = get_package_share_directory('tm_moveit_cpp_demo') + "/launch/run_moveit_cpp.rviz"
+    rviz_config_file = get_package_share_directory('tm_moveit_cpp_demo') + "/launch/run_moveit_cpp_motion.rviz"
     rviz_node = Node(
         package='rviz2',
         executable='rviz2',

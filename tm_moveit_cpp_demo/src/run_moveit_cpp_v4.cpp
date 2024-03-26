@@ -88,7 +88,7 @@ public:
     auto robot_first_state = moveit_cpp_->getCurrentState();
 
     // A little delay before running the plan
-    rclcpp::sleep_for(std::chrono::seconds(3));
+    rclcpp::sleep_for(std::chrono::seconds(1));
 
     // Create collision object, planning shouldn't be too easy
     moveit_msgs::msg::CollisionObject collision_object;
