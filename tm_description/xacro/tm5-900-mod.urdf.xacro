@@ -16,7 +16,6 @@
   <!-- you must modify 'macro.tm5-900-nominal.urdf.xacro' to 'user_defined.urdf.xacro'  -->
   <xacro:include filename="$(find tm_description)/xacro/macro.tm5-900-nominal-mod.urdf.xacro" />
 
-
   <!--  -->
   <xacro:tmr_gazebo ns="$(arg ns)" prefix="$(arg prefix)" />
   <xacro:tmr_transmission prefix="$(arg prefix)" hw_iface="$(arg trans_hw_iface)" />

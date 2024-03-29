@@ -118,6 +118,15 @@ def generate_launch_description():
         arguments=['0.0', '0.0', '0.0', '0.0', '0.0', '0.0', 'world', 'base']
     )
 
+    # Static TF for RG2
+    static_tf = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        name='static_transform_publisher_rg2',
+        output='log',
+        arguments=['0.0', '0.0', '0.0', '0.0', '0.0', '0.0', 'flange', 'onrobot_rg2_base_link']
+    )
+
     # Publish TF
     robot_state_publisher = Node(
         package='robot_state_publisher',
