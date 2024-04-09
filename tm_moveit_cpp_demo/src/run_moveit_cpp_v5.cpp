@@ -64,6 +64,8 @@
 
 #include "onrobot_rg_msgs/srv/set_command.hpp"
 #include "custom_interfaces/srv/get_spectrum.hpp"
+#include "custom_interfaces/msg/leaf_pose_arrays.hpp"
+
 
 
 static const rclcpp::Logger LOGGER = rclcpp::get_logger("moveit_cpp_demo");
@@ -80,8 +82,11 @@ public:
     , onrobot_rg_set_command_client_(node_->create_client<onrobot_rg_msgs::srv::SetCommand>("/onrobot_rg/set_command"))
     , get_spectrum_client_(node_->create_client<custom_interfaces::srv::GetSpectrum>("/get_spectrum"))
   {
-    target_leaves_subscriber_ = node_->create_subscription<geometry_msgs::msg::PoseArray>(
-            "/target_leaves", 10, std::bind(&MoveItCppDemo::targetLeavesCallback, this, std::placeholders::_1));
+    // target_leaves_subscriber_ = node_->create_subscription<geometry_msgs::msg::PoseArray>(
+    //         "/target_leaves", 10, std::bind(&MoveItCppDemo::targetLeavesCallback, this, std::placeholders::_1));
+
+    leaf_pose_arrays_subscriber_ = node_->create_subscription<custom_interfaces::msg::LeafPoseArrays>(
+        "/target_leaves_multi_pose", 10, std::bind(&MoveItCppDemo::leafPoseArraysCallback, this, std::placeholders::_1));
   }
 
   void run()
@@ -206,46 +211,56 @@ public:
     performServiceCalls();
     for (size_t i = 0; i < target_poses_.size(); ++i)
     {
-      RCLCPP_INFO(LOGGER, "Setting goal for point %zu", i);
-      arm.setGoal(target_poses_[i], "gripper");
-
-      RCLCPP_INFO(LOGGER, "Planning to goal for point %zu", i);
-      auto plan_solution = arm.plan();
-
-      if (plan_solution)
+      bool planFound = false;
+      std::vector<std::vector<geometry_msgs::msg::PoseStamped>> allPoses = { {target_poses_[i]} };
+      if (i < alternative_target_poses_.size()) 
       {
-        RCLCPP_INFO(LOGGER, "Plan found for point %zu", i);
-        plan_outcomes[i] = 1;  
-        outcome_log += "Point " + std::to_string(i) + ": Success\n";
-
-        // visual_tools.publishAxisLabeled(robot_first_state->getGlobalLinkTransform("link_6"), "start_pose");
-        // // Visualize the goal pose in Rviz
-        // visual_tools.publishAxisLabeled(target_poses_[i].pose, "target_pose");
-        // visual_tools.publishText(text_pose, "setStartStateToCurrentState", rvt::WHITE, rvt::XLARGE);
-        // // Visualize the trajectory in Rviz
-        // visual_tools.publishTrajectoryLine(plan_solution.trajectory, joint_model_group_ptr);
-        // visual_tools.trigger();
-
-
-        arm.execute();
-        bool goalReached = false;
-        while (rclcpp::ok())
-        {
-          if (PoseCompare("gripper", "link_0", target_poses_[i], 0.001, 0.05)) 
-          { 
-            RCLCPP_INFO(LOGGER, "Gripper reached the goal for point %zu.", i);
-            goalReached = true;
-            rclcpp::sleep_for(std::chrono::seconds(10));
-            performServiceCalls();
-            break;
-          } 
-          else 
-          {
-            RCLCPP_INFO(LOGGER, "Gripper has not reached the goal for point %zu yet.", i);
-            rclcpp::sleep_for(std::chrono::seconds(3));
+          for (auto& alternative_poses : alternative_target_poses_[i]) {
+              allPoses.push_back({alternative_poses}); 
           }
-          
+      }
+
+      for (auto& poses : allPoses) 
+        {
+          for (auto& pose : poses) 
+          {
+            RCLCPP_INFO(LOGGER, "Setting goal for point %zu", i);
+            arm.setGoal(pose, "gripper");
+            
+            RCLCPP_INFO(LOGGER, "Planning to goal for point %zu", i);
+            auto plan_solution = arm.plan();
+
+              if(plan_solution) 
+              {
+                  RCLCPP_INFO(LOGGER, "Plan found for point %zu", i);
+                  arm.execute();
+                  while (rclcpp::ok())
+                  {
+                    if (PoseCompare("gripper", "link_0", pose, 0.001, 0.05)) 
+                    { 
+                      RCLCPP_INFO(LOGGER, "Gripper reached the goal for point %zu.", i);
+                      goalReached = true;
+
+                      rclcpp::sleep_for(std::chrono::seconds(6));
+                      performServiceCalls();
+                      break;
+                    } 
+                    else 
+                    {
+                      RCLCPP_INFO(LOGGER, "Gripper has not reached the goal for point %zu yet.", i);
+                      rclcpp::sleep_for(std::chrono::seconds(3));
+                    }
+                    
+                  }
+                  planFound = true;
+                  break; 
+              }
+          }
+          if (planFound) break;
         }
+
+        
+        
 
         rclcpp::sleep_for(std::chrono::seconds(3));
 
@@ -449,8 +464,12 @@ private:
   rclcpp::Publisher<moveit_msgs::msg::DisplayRobotState>::SharedPtr robot_state_publisher_;
   moveit::planning_interface::MoveItCppPtr moveit_cpp_;
   
-  rclcpp::Subscription<geometry_msgs::msg::PoseArray>::SharedPtr target_leaves_subscriber_;
+  // rclcpp::Subscription<geometry_msgs::msg::PoseArray>::SharedPtr target_leaves_subscriber_;
+  rclcpp::Subscription<custom_interfaces::msg::LeafPoseArrays>::SharedPtr leaf_pose_arrays_subscriber_;
+
+
   std::vector<geometry_msgs::msg::PoseStamped> target_poses_;
+  std::vector<std::vector<geometry_msgs::msg::PoseStamped>> alternative_target_poses_; 
 
   rclcpp::Client<onrobot_rg_msgs::srv::SetCommand>::SharedPtr onrobot_rg_set_command_client_;
   rclcpp::Client<custom_interfaces::srv::GetSpectrum>::SharedPtr get_spectrum_client_;
@@ -477,22 +496,51 @@ private:
     return output_pose;
   }
 
-  void targetLeavesCallback(const geometry_msgs::msg::PoseArray::SharedPtr msg)
-  { 
-    target_poses_.clear();
-    std::vector<geometry_msgs::msg::PoseStamped> target_poses;
-    for (const auto& pose : msg->poses)
-    {
-      geometry_msgs::msg::PoseStamped pose_stamped;
-      pose_stamped.pose = pose;
-      pose_stamped.header.frame_id = "gripper";
-      // pose_stamped.header.frame_id = "camera_depth_optical_frame";
-      pose_stamped.header.stamp = node_->get_clock()->now();
+  // void targetLeavesCallback(const geometry_msgs::msg::PoseArray::SharedPtr msg)
+  // { 
+  //   target_poses_.clear();
+  //   std::vector<geometry_msgs::msg::PoseStamped> target_poses;
+  //   for (const auto& pose : msg->poses)
+  //   {
+  //     geometry_msgs::msg::PoseStamped pose_stamped;
+  //     pose_stamped.pose = pose;
+  //     pose_stamped.header.frame_id = "gripper";
+  //     // pose_stamped.header.frame_id = "camera_depth_optical_frame";
+  //     pose_stamped.header.stamp = node_->get_clock()->now();
 
-      auto transformed_pose = transformPose(pose_stamped, "link_0");
-      target_poses_.push_back(transformed_pose);
+  //     auto transformed_pose = transformPose(pose_stamped, "link_0");
+  //     target_poses_.push_back(transformed_pose);
+  //   }
+
+  //   packages_received_ = true;
+  // }
+
+  void leafPoseArraysCallback(const custom_interfaces::msg::LeafPoseArrays::SharedPtr msg)
+  {
+    target_poses_.clear();
+    alternative_target_poses_.clear();
+
+    for (const auto& pose : msg->Poses1.poses) {
+        geometry_msgs::msg::PoseStamped pose_stamped;
+        pose_stamped.pose = pose;
+        pose_stamped.header = msg->header; 
+        auto transformed_pose = transformPose(pose_stamped, "link_0"); 
+        target_poses_.push_back(transformed_pose);
     }
 
+    std::vector<geometry_msgs::msg::PoseArray> alternative_poses = {msg->Poses2, msg->Poses3, msg->Poses4, msg->Poses5};
+    
+    for (auto& pose_array : alternative_poses) {
+        std::vector<geometry_msgs::msg::PoseStamped> current_alternatives;
+        for (const auto& pose : pose_array.poses) {
+          geometry_msgs::msg::PoseStamped pose_stamped;
+          pose_stamped.pose = pose;
+          pose_stamped.header = msg->header; 
+          auto transformed_pose = transformPose(pose_stamped, "link_0"); 
+          current_alternatives.push_back(transformed_pose);
+        }
+        alternative_target_poses_.push_back(current_alternatives);
+    }
     packages_received_ = true;
   }
 };

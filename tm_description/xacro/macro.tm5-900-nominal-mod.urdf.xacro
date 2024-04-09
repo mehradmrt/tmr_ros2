@@ -256,6 +256,7 @@
     <visual>
       <geometry>
         <!-- <mesh filename="package://tm_description/meshes/tm5-900/visual/tmr_ee.${format}" /> -->
+        <!-- <mesh filename="package://tm_description/meshes/tm5-900/visual/urdf_link6_modified.STL"/> -->
         <mesh filename="package://tm_description/meshes/tm5-900/visual/urdf_link6_modified_rg2less.STL"/>
       </geometry>
       <material name="gray">
@@ -266,6 +267,7 @@
     <collision>
       <geometry>
         <!-- <mesh filename="package://tm_description/meshes/tm5-900/collision/tmr_ee_c.stl" /> -->
+        <!-- <mesh filename="package://tm_description/meshes/tm5-900/collision/urdf_link6_modified.STL"/> -->
         <mesh filename="package://tm_description/meshes/tm5-900/collision/urdf_link6_modified_rg2less.STL"/>
       </geometry>
     </collision>
@@ -304,9 +306,9 @@
   <xacro:include filename="$(find onrobot_rg_description)/urdf/onrobot_rg2_model.xacro" />
 
   <joint name="RG2_TM_attachment" type="fixed">
-    <parent link="flange" />  <!-- Adjust this to the actual last link of the TM5 arm -->
+    <parent link="flange" /> 
     <child link="onrobot_rg2_base_link" />
-    <origin xyz="0.0 0.0 0.0" rpy="0 0 1.5707" />  <!-- Adjust this to the correct position and orientation -->
+    <origin xyz="0.0 0.0 0.0" rpy="0 0 1.5707" /> 
   </joint>
 
 

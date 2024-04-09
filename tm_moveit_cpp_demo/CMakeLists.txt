@@ -26,6 +26,12 @@ endif()
 # This shouldn't be necessary (required by moveit_simple_controller_manager)
 find_package(rosidl_default_runtime REQUIRED)
 find_package(Boost REQUIRED COMPONENTS system)
+
+find_package(onrobot_rg_msgs REQUIRED)
+find_package(custom_interfaces REQUIRED)
+find_package(moveit_visual_tools REQUIRED)
+find_package(rviz_visual_tools REQUIRED)
+
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
@@ -43,11 +49,17 @@ if (moveit_ros_planning_interface_FOUND)
   message("--- TMDriver message : MoveIt2_LIB is found")
   endif()
 
-  add_executable(run_moveit_cpp src/run_moveit_cpp_v4.cpp)
+  add_executable(run_moveit_cpp src/run_moveit_cpp_v5.cpp)
   ament_target_dependencies(run_moveit_cpp
     moveit_ros_planning_interface
     Boost
+    onrobot_rg_msgs
+    custom_interfaces
+    # moveit_visual_tools
+    # rviz_visual_tools
   )
+
+
   install(TARGETS run_moveit_cpp
     EXPORT export_${PROJECT_NAME}
     DESTINATION lib/${PROJECT_NAME}

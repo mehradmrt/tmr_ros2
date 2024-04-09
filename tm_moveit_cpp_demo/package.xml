@@ -9,8 +9,15 @@
   <maintainer email="yh.wang@tm-robot.com">Yh Wang</maintainer>
   <license>BSD</license>
 
-  <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>onrobot_rg_msgs</depend>
+  <depend>custom_interfaces</depend>
 
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  
+  <!-- <depend>rviz_visual_tools</depend>
+  <depend>moveit_visual_tools</depend> -->
+  
   <depend>moveit_ros_planning_interface</depend>
 
   <test_depend>ament_lint_auto</test_depend>

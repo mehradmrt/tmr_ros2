@@ -71,4 +71,49 @@
     <disable_collisions link1="link_3" link2="link_4" reason="Adjacent" />
     <disable_collisions link1="link_4" link2="link_5" reason="Adjacent" />
     <disable_collisions link1="link_5" link2="link_6" reason="Adjacent" />
+
+    <!-- Disable collisions among gripper links -->
+    <disable_collisions link1="onrobot_rg2_base_link" link2="left_outer_knuckle" reason="Gripper" />
+    <disable_collisions link1="onrobot_rg2_base_link" link2="left_inner_finger" reason="Gripper" />
+    <disable_collisions link1="onrobot_rg2_base_link" link2="left_inner_knuckle" reason="Gripper" />
+    <disable_collisions link1="onrobot_rg2_base_link" link2="right_inner_knuckle" reason="Gripper" />
+    <disable_collisions link1="onrobot_rg2_base_link" link2="right_outer_knuckle" reason="Gripper" />
+    <disable_collisions link1="onrobot_rg2_base_link" link2="right_inner_finger" reason="Gripper" />
+
+    <disable_collisions link1="left_outer_knuckle" link2="left_inner_finger" reason="Gripper" />
+    <disable_collisions link1="left_outer_knuckle" link2="left_inner_knuckle" reason="Gripper" />
+    <disable_collisions link1="left_outer_knuckle" link2="right_inner_knuckle" reason="Gripper" />
+    <disable_collisions link1="left_outer_knuckle" link2="right_outer_knuckle" reason="Gripper" />
+    <disable_collisions link1="left_outer_knuckle" link2="right_inner_finger" reason="Gripper" />
+
+    <disable_collisions link1="left_inner_finger" link2="left_inner_knuckle" reason="Gripper" />
+    <disable_collisions link1="left_inner_finger" link2="right_inner_knuckle" reason="Gripper" />
+    <disable_collisions link1="left_inner_finger" link2="right_outer_knuckle" reason="Gripper" />
+    <disable_collisions link1="left_inner_finger" link2="right_inner_finger" reason="Gripper" />
+
+    <disable_collisions link1="left_inner_knuckle" link2="right_inner_knuckle" reason="Gripper" />
+    <disable_collisions link1="left_inner_knuckle" link2="right_outer_knuckle" reason="Gripper" />
+    <disable_collisions link1="left_inner_knuckle" link2="right_inner_finger" reason="Gripper" />
+
+    <disable_collisions link1="right_inner_knuckle" link2="right_outer_knuckle" reason="Gripper" />
+    <disable_collisions link1="right_inner_knuckle" link2="right_inner_finger" reason="Gripper" />
+
+    <disable_collisions link1="right_outer_knuckle" link2="right_inner_finger" reason="Gripper" />
+
+    <!-- Disable collisions between gripper links and link_6 & link_5 -->
+    <disable_collisions link1="onrobot_rg2_base_link" link2="link_6" reason="Gripper" />
+    <disable_collisions link1="onrobot_rg2_base_link" link2="link_5" reason="Gripper" />
+    <disable_collisions link1="left_outer_knuckle" link2="link_6" reason="Gripper" />
+    <disable_collisions link1="left_outer_knuckle" link2="link_5" reason="Gripper" />
+    <disable_collisions link1="left_inner_finger" link2="link_6" reason="Gripper" />
+    <disable_collisions link1="left_inner_finger" link2="link_5" reason="Gripper" />
+    <disable_collisions link1="left_inner_knuckle" link2="link_6" reason="Gripper" />
+    <disable_collisions link1="left_inner_knuckle" link2="link_5" reason="Gripper" />
+    <disable_collisions link1="right_inner_knuckle" link2="link_6" reason="Gripper" />
+    <disable_collisions link1="right_inner_knuckle" link2="link_5" reason="Gripper" />
+    <disable_collisions link1="right_outer_knuckle" link2="link_6" reason="Gripper" />
+    <disable_collisions link1="right_outer_knuckle" link2="link_5" reason="Gripper" />
+    <disable_collisions link1="right_inner_finger" link2="link_6" reason="Gripper" />
+    <disable_collisions link1="right_inner_finger" link2="link_5" reason="Gripper" />   
+
 </robot>
