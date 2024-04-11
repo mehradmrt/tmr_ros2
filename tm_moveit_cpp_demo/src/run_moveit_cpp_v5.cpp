@@ -156,9 +156,8 @@ public:
       scene->processCollisionObjectMsg(collision_object);
     }  // Unlock PlanningScene
 
-    std::vector<int> plan_outcomes(target_poses_.size(), 9);  
     std::string outcome_log = "Planning outcomes for all points:\n";
-    for (size_t i = 0; i < target_poses_.size(); ++i)
+    for (size_t i = 0; i < all_target_poses_[0].size(); ++i)
     {
       moveit_msgs::msg::CollisionObject collision_leaf;
       collision_leaf.header.frame_id = "link_0";
@@ -168,7 +167,7 @@ public:
       leaf_box.type = leaf_box.BOX;
       leaf_box.dimensions = { 0.01, 0.1, 0.05 };
 
-      geometry_msgs::msg::Pose leaf_box_pose = target_poses_[i].pose; 
+      geometry_msgs::msg::Pose leaf_box_pose = all_target_poses_[0][i].pose; 
 
       collision_leaf.primitives.push_back(leaf_box);
       collision_leaf.primitive_poses.push_back(leaf_box_pose);
@@ -179,155 +178,85 @@ public:
       }   
     }
 
-    // arm.setGoal("home2");
-    // RCLCPP_INFO(LOGGER, "Plan to home2");
-    // auto home_solution = arm.plan();
-    // if (home_solution)
-    // {
-    //   RCLCPP_INFO(LOGGER, "Executing movement to 'home2'");
-    //   arm.execute();
-
-    //   RCLCPP_INFO(LOGGER, "Waiting for robot to reach 'home2'...");
-    //   bool HomeReached = false;
-
-    //   while (rclcpp::ok())
-    //   { 
-    //     auto robot_state = moveit_cpp_->getCurrentState();
-    //     if (isRobotHome(robot_state, "home2")) 
-    //     { 
-    //       RCLCPP_INFO(LOGGER, "Robot has reached 'home2' position.");
-    //       rclcpp::sleep_for(std::chrono::seconds(3));
-    //       HomeReached = true;
-    //       break;
-    //     } 
-    //     else 
-    //     {
-    //       rclcpp::sleep_for(std::chrono::seconds(3));
-    //     }
-    //   }
-    // }
-
+    // ------------------------------------------
+    // ------------ Planning Begins -------------
+    // ------------------------------------------
 
     performServiceCalls();
-    for (size_t i = 0; i < target_poses_.size(); ++i)
+    for (size_t i = 0; i < all_target_poses_[0].size(); ++i)
     {
       bool planFound = false;
-      std::vector<std::vector<geometry_msgs::msg::PoseStamped>> allPoses = { {target_poses_[i]} };
-      if (i < alternative_target_poses_.size()) 
+      for (size_t j = 0; j < all_target_poses_.size(); ++j)
       {
-          for (auto& alternative_poses : alternative_target_poses_[i]) {
-              allPoses.push_back({alternative_poses}); 
-          }
-      }
-
-      for (auto& poses : allPoses) 
-        {
-          for (auto& pose : poses) 
-          {
-            RCLCPP_INFO(LOGGER, "Setting goal for point %zu", i);
-            arm.setGoal(pose, "gripper");
-            
-            RCLCPP_INFO(LOGGER, "Planning to goal for point %zu", i);
-            auto plan_solution = arm.plan();
-
-              if(plan_solution) 
-              {
-                  RCLCPP_INFO(LOGGER, "Plan found for point %zu", i);
-                  arm.execute();
-                  while (rclcpp::ok())
-                  {
-                    if (PoseCompare("gripper", "link_0", pose, 0.001, 0.05)) 
-                    { 
-                      RCLCPP_INFO(LOGGER, "Gripper reached the goal for point %zu.", i);
-                      goalReached = true;
-
-                      rclcpp::sleep_for(std::chrono::seconds(6));
-                      performServiceCalls();
-                      break;
-                    } 
-                    else 
-                    {
-                      RCLCPP_INFO(LOGGER, "Gripper has not reached the goal for point %zu yet.", i);
-                      rclcpp::sleep_for(std::chrono::seconds(3));
-                    }
-                    
-                  }
-                  planFound = true;
-                  break; 
-              }
-          }
-          if (planFound) break;
-        }
-
+        const auto& pose = all_target_poses_[j][i];
+        RCLCPP_INFO(LOGGER, "Setting goal for point %zu with pose %zu", i+1, j+1);
+        arm.setGoal(pose, "gripper");
         
-        
+        RCLCPP_INFO(LOGGER, "Planning to goal for point %zu, with pose %zu", i+1, j+1);
+        auto plan_solution = arm.plan();
 
-        rclcpp::sleep_for(std::chrono::seconds(3));
-
-        // arm.setGoal("home2");
-        // RCLCPP_INFO(LOGGER, "Plan to home2");
-        // auto home_solution = arm.plan();
-        // if (home_solution)
-        // {
-        //   RCLCPP_INFO(LOGGER, "Executing movement to 'home2'");
-        //   arm.execute();
-
-        //   RCLCPP_INFO(LOGGER, "Waiting for robot to reach 'home2'...");
-        //   bool HomeReached = false;
-
-        //   while (rclcpp::ok())
-        //   { 
-        //     auto robot_state = moveit_cpp_->getCurrentState();
-        //     if (isRobotHome(robot_state, "home2")) 
-        //     { 
-        //       RCLCPP_INFO(LOGGER, "Robot has reached 'home2' position.");
-        //       rclcpp::sleep_for(std::chrono::seconds(3));
-        //       HomeReached = true;
-        //       break;
-        //     } 
-        //     else 
-        //     {
-        //       rclcpp::sleep_for(std::chrono::seconds(3));
-        //     }
-        //   }
-        // }
-
-        arm.setGoal(*robot_first_state);
-        auto return_plan_solution = arm.plan();
-        if (return_plan_solution)
-        {
-          RCLCPP_INFO(LOGGER, "Returning to initial state.");
+        if(plan_solution) 
+        { 
+          outcome_log += "Point " + std::to_string(i+1) + "Pose "+ std::to_string(j+1) +": SUCCESS\n";
+          RCLCPP_INFO(LOGGER, "Plan found for point %zu", i+1);
           arm.execute();
-
-          RCLCPP_INFO(LOGGER, "Waiting for robot to reach first state...");
-          bool FirstStateReached = false;
-
+          bool goalReached = false;
           while (rclcpp::ok())
-          { 
-            auto current_state = moveit_cpp_->getCurrentState();
-            if (isRobotBack(current_state, robot_first_state)) 
-            { 
-              RCLCPP_INFO(LOGGER, "Robot reached its first state.");
+          {
+            if (PoseCompare("gripper", "link_0", pose, 0.001, 0.05)) 
+            {
+              RCLCPP_INFO(LOGGER, "Gripper reached the goal for point %zu, with pose %zu.", i+1, j+1);
+              bool goalReached = true;
+
               rclcpp::sleep_for(std::chrono::seconds(3));
-              FirstStateReached = true;
+              performServiceCalls();
               break;
-            } 
+            }
             else 
             {
-              RCLCPP_INFO(LOGGER, "Robot has NOT reached its first state.");
+              RCLCPP_INFO(LOGGER, "Gripper has not reached the goal for point %zu, with pose %zu yet.", i+1, j+1);
               rclcpp::sleep_for(std::chrono::seconds(3));
             }
           }
+
+          rclcpp::sleep_for(std::chrono::seconds(3));
+
+          arm.setGoal(*robot_first_state);
+          auto return_plan_solution = arm.plan();
+          if (return_plan_solution)
+          {
+            RCLCPP_INFO(LOGGER, "Returning to initial state.");
+            arm.execute();
+
+            RCLCPP_INFO(LOGGER, "Waiting for robot to reach first state...");
+            bool FirstStateReached = false;
+
+            while (rclcpp::ok())
+            { 
+              auto current_state = moveit_cpp_->getCurrentState();
+              if (isRobotBack(current_state, robot_first_state)) 
+              { 
+                RCLCPP_INFO(LOGGER, "Robot reached its first state.");
+                rclcpp::sleep_for(std::chrono::seconds(3));
+                FirstStateReached = true;
+                break;
+              } 
+              else 
+              {
+                RCLCPP_INFO(LOGGER, "Robot has NOT reached its first state.");
+                rclcpp::sleep_for(std::chrono::seconds(3));
+              }
+            }
+          }
+          planFound = true;
+          break; 
+        }
+        else
+        {
+          RCLCPP_INFO(LOGGER, "No plan found for point %zu, with pose %zu", i+1, j+1);
+          outcome_log += "Point " + std::to_string(i+1) + "Pose "+ std::to_string(j+1) +": FAILED\n";
         }
       }
-      else
-      {
-        RCLCPP_INFO(LOGGER, "No plan found for point %zu", i);
-        plan_outcomes[i] = 0;
-        outcome_log += "Point " + std::to_string(i) + ": Failure\n";
-      }
-      
-      rclcpp::sleep_for(std::chrono::seconds(3));
     }
     RCLCPP_INFO(LOGGER, "%s", outcome_log.c_str());
   }
@@ -371,7 +300,8 @@ public:
 
   }
 
-  bool isRobotHome(const moveit::core::RobotStatePtr& robot_state, const std::string& home_position_name) {
+  bool isRobotHome(const moveit::core::RobotStatePtr& robot_state, const std::string& home_position_name) 
+  {
       const std::string group_name = "tmr_arm";
       const auto* joint_model_group = robot_state->getJointModelGroup(group_name);
       double tolerance = 0.002;
@@ -399,7 +329,8 @@ public:
 
   bool isRobotBack(const moveit::core::RobotStatePtr& current_state, 
                  const moveit::core::RobotStatePtr& initial_state, 
-                 double tolerance = 0.002) {
+                 double tolerance = 0.002) 
+  {
     const moveit::core::RobotModelConstPtr& robot_model = current_state->getRobotModel();
     const std::vector<std::string>& joint_group_names = robot_model->getJointModelGroupNames();
 
@@ -418,7 +349,8 @@ public:
     return true;
   }
 
-  void performServiceCalls() {
+  void performServiceCalls() 
+  {
     if (!onrobot_rg_set_command_client_->wait_for_service(std::chrono::seconds(1))) {
         RCLCPP_ERROR(node_->get_logger(), "/onrobot_rg/set_command service not available.");
         return;
@@ -467,9 +399,8 @@ private:
   // rclcpp::Subscription<geometry_msgs::msg::PoseArray>::SharedPtr target_leaves_subscriber_;
   rclcpp::Subscription<custom_interfaces::msg::LeafPoseArrays>::SharedPtr leaf_pose_arrays_subscriber_;
 
-
-  std::vector<geometry_msgs::msg::PoseStamped> target_poses_;
-  std::vector<std::vector<geometry_msgs::msg::PoseStamped>> alternative_target_poses_; 
+  // std::vector<geometry_msgs::msg::PoseStamped> target_poses_;
+  std::vector<std::vector<geometry_msgs::msg::PoseStamped>> all_target_poses_; 
 
   rclcpp::Client<onrobot_rg_msgs::srv::SetCommand>::SharedPtr onrobot_rg_set_command_client_;
   rclcpp::Client<custom_interfaces::srv::GetSpectrum>::SharedPtr get_spectrum_client_;
@@ -515,34 +446,28 @@ private:
   //   packages_received_ = true;
   // }
 
-  void leafPoseArraysCallback(const custom_interfaces::msg::LeafPoseArrays::SharedPtr msg)
+  void leafPoseArraysCallback(const custom_interfaces::msg::LeafPoseArrays::SharedPtr msg) 
   {
-    target_poses_.clear();
-    alternative_target_poses_.clear();
+    all_target_poses_.clear();
+    std::vector<std::vector<geometry_msgs::msg::Pose>> all_poses = {
+      msg->poses1, msg->poses2, msg->poses3, msg->poses4, msg->poses5};
 
-    for (const auto& pose : msg->Poses1.poses) {
+    for (const auto& pose_array : all_poses) 
+    {
+      std::vector<geometry_msgs::msg::PoseStamped> transformed_poses_array;
+      for (const auto& pose : pose_array) 
+      {
         geometry_msgs::msg::PoseStamped pose_stamped;
         pose_stamped.pose = pose;
-        pose_stamped.header = msg->header; 
-        auto transformed_pose = transformPose(pose_stamped, "link_0"); 
-        target_poses_.push_back(transformed_pose);
-    }
-
-    std::vector<geometry_msgs::msg::PoseArray> alternative_poses = {msg->Poses2, msg->Poses3, msg->Poses4, msg->Poses5};
-    
-    for (auto& pose_array : alternative_poses) {
-        std::vector<geometry_msgs::msg::PoseStamped> current_alternatives;
-        for (const auto& pose : pose_array.poses) {
-          geometry_msgs::msg::PoseStamped pose_stamped;
-          pose_stamped.pose = pose;
-          pose_stamped.header = msg->header; 
-          auto transformed_pose = transformPose(pose_stamped, "link_0"); 
-          current_alternatives.push_back(transformed_pose);
-        }
-        alternative_target_poses_.push_back(current_alternatives);
+        pose_stamped.header = msg->header;
+        auto transformed_pose = transformPose(pose_stamped, "link_0");
+        transformed_poses_array.push_back(transformed_pose);
+      }
+      all_target_poses_.push_back(transformed_poses_array);
     }
     packages_received_ = true;
   }
+
 };
 
 int main(int argc, char** argv)
@@ -557,12 +482,13 @@ int main(int argc, char** argv)
   rclcpp::Node::SharedPtr node = rclcpp::Node::make_shared("run_moveit_cpp", "", node_options);
 
   MoveItCppDemo demo(node);
-  while (rclcpp::ok()) {
-        rclcpp::spin_some(node);
-        // std::this_thread::sleep_for(std::chrono::seconds(8)); 
-        demo.processNewData();
-        std::this_thread::sleep_for(std::chrono::seconds(5)); 
-    }
+  while (rclcpp::ok()) 
+  {
+    rclcpp::spin_some(node);
+    // std::this_thread::sleep_for(std::chrono::seconds(8)); 
+    demo.processNewData();
+    std::this_thread::sleep_for(std::chrono::seconds(5)); 
+  }
   return 0;
 }
  

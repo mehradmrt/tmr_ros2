@@ -356,7 +356,8 @@ public:
 
   }
 
-  bool isRobotHome(const moveit::core::RobotStatePtr& robot_state, const std::string& home_position_name) {
+  bool isRobotHome(const moveit::core::RobotStatePtr& robot_state, const std::string& home_position_name) 
+  {
       const std::string group_name = "tmr_arm";
       const auto* joint_model_group = robot_state->getJointModelGroup(group_name);
       double tolerance = 0.002;
@@ -384,7 +385,8 @@ public:
 
   bool isRobotBack(const moveit::core::RobotStatePtr& current_state, 
                  const moveit::core::RobotStatePtr& initial_state, 
-                 double tolerance = 0.002) {
+                 double tolerance = 0.002) 
+  {
     const moveit::core::RobotModelConstPtr& robot_model = current_state->getRobotModel();
     const std::vector<std::string>& joint_group_names = robot_model->getJointModelGroupNames();
 
