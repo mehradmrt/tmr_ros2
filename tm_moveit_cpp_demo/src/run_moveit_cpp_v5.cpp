@@ -50,7 +50,6 @@
 #include <moveit/moveit_cpp/planning_component.h>
 #include <moveit/robot_state/conversions.h>
 #include <moveit_msgs/msg/display_robot_state.hpp>
-#include <trajectory_msgs/msg/joint_trajectory.hpp>
 
 // #include <moveit_visual_tools/moveit_visual_tools.h>
 // #include <rviz_visual_tools/rviz_visual_tools.hpp>
@@ -67,9 +66,7 @@
 #include "custom_interfaces/msg/leaf_pose_arrays.hpp"
 
 
-
 static const rclcpp::Logger LOGGER = rclcpp::get_logger("moveit_cpp_demo");
-
 
 class MoveItCppDemo
 {
@@ -81,16 +78,18 @@ public:
     , robot_state_publisher_(node_->create_publisher<moveit_msgs::msg::DisplayRobotState>("display_robot_state", 1))
     , onrobot_rg_set_command_client_(node_->create_client<onrobot_rg_msgs::srv::SetCommand>("/onrobot_rg/set_command"))
     , get_spectrum_client_(node_->create_client<custom_interfaces::srv::GetSpectrum>("/get_spectrum"))
+    
   {
     // target_leaves_subscriber_ = node_->create_subscription<geometry_msgs::msg::PoseArray>(
     //         "/target_leaves", 10, std::bind(&MoveItCppDemo::targetLeavesCallback, this, std::placeholders::_1));
 
     leaf_pose_arrays_subscriber_ = node_->create_subscription<custom_interfaces::msg::LeafPoseArrays>(
         "/target_leaves_multi_pose", 10, std::bind(&MoveItCppDemo::leafPoseArraysCallback, this, std::placeholders::_1));
+
   }
 
   void run()
-  {
+  { 
     RCLCPP_INFO(LOGGER, "Initialize MoveItCpp");
     moveit_cpp_ = std::make_shared<moveit::planning_interface::MoveItCpp>(node_);
     moveit_cpp_->getPlanningSceneMonitor()->providePlanningSceneService();  // let RViz display query PlanningScene
@@ -123,8 +122,6 @@ public:
     // visual_tools.publishText(text_pose, "MoveItCpp_Demo", rvt::WHITE, rvt::XLARGE);
     // visual_tools.trigger();
 
-
-
     // A little delay before running the plan
     rclcpp::sleep_for(std::chrono::seconds(1));
 
@@ -137,14 +134,14 @@ public:
     box.type = box.BOX;
     box.dimensions = { 1.0, 0.8, 0.4 };
 
-    tf2::Quaternion quat;
-    quat.setRPY(0, 0, 0);  // quat.setRPY(0, 0, -M_PI / 4); Rotate -45 degrees around Z-axis
+    tf2::Quaternion box_quat;
+    box_quat.setRPY(0, 0, 0);  // quat.setRPY(0, 0, -M_PI / 4); Rotate -45 degrees around Z-axis
 
     geometry_msgs::msg::Pose box_pose;
     box_pose.position.x = -0.35;  
     box_pose.position.y = 0.0; //0.25;
     box_pose.position.z = -0.15;
-    box_pose.orientation = tf2::toMsg(quat);
+    box_pose.orientation = tf2::toMsg(box_quat);
 
     collision_object.primitives.push_back(box);
     collision_object.primitive_poses.push_back(box_pose);
@@ -157,25 +154,25 @@ public:
     }  // Unlock PlanningScene
 
     std::string outcome_log = "Planning outcomes for all points:\n";
-    for (size_t i = 0; i < all_target_poses_[0].size(); ++i)
+    for (size_t k = 0; k < all_target_poses_gripper_[0].size(); ++k)
     {
       moveit_msgs::msg::CollisionObject collision_leaf;
-      collision_leaf.header.frame_id = "link_0";
-      collision_leaf.id = "leaf_" + std::to_string(i);
+      collision_leaf.header.frame_id = "gripper";
+      collision_leaf.id = "leaf_" + std::to_string(k);
 
       shape_msgs::msg::SolidPrimitive leaf_box;
       leaf_box.type = leaf_box.BOX;
       leaf_box.dimensions = { 0.01, 0.1, 0.05 };
 
-      geometry_msgs::msg::Pose leaf_box_pose = all_target_poses_[0][i].pose; 
+      geometry_msgs::msg::Pose leaf_box_pose = all_target_poses_gripper_[0][k]; 
 
       collision_leaf.primitives.push_back(leaf_box);
       collision_leaf.primitive_poses.push_back(leaf_box_pose);
       collision_leaf.operation = collision_leaf.ADD;
-      {  
+      {
         planning_scene_monitor::LockedPlanningSceneRW scene(moveit_cpp_->getPlanningSceneMonitor());
         scene->processCollisionObjectMsg(collision_leaf);
-      }   
+      }
     }
 
     // ------------------------------------------
@@ -254,7 +251,7 @@ public:
         else
         {
           RCLCPP_INFO(LOGGER, "No plan found for point %zu, with pose %zu", i+1, j+1);
-          outcome_log += "Point " + std::to_string(i+1) + "Pose "+ std::to_string(j+1) +": FAILED\n";
+          outcome_log += "Point " + std::to_string(i+1) + ", Pose "+ std::to_string(j+1) +": FAILED\n";
         }
       }
     }
@@ -374,7 +371,6 @@ public:
     // rclcpp::sleep_for(std::chrono::seconds(3)); 
   } 
 
-
   void processNewData()
   {
       if (packages_received_)
@@ -400,7 +396,8 @@ private:
   rclcpp::Subscription<custom_interfaces::msg::LeafPoseArrays>::SharedPtr leaf_pose_arrays_subscriber_;
 
   // std::vector<geometry_msgs::msg::PoseStamped> target_poses_;
-  std::vector<std::vector<geometry_msgs::msg::PoseStamped>> all_target_poses_; 
+  std::vector<std::vector<geometry_msgs::msg::PoseStamped>> all_target_poses_;
+  std::vector<std::vector<geometry_msgs::msg::Pose>> all_target_poses_gripper_;
 
   rclcpp::Client<onrobot_rg_msgs::srv::SetCommand>::SharedPtr onrobot_rg_set_command_client_;
   rclcpp::Client<custom_interfaces::srv::GetSpectrum>::SharedPtr get_spectrum_client_;
@@ -427,30 +424,15 @@ private:
     return output_pose;
   }
 
-  // void targetLeavesCallback(const geometry_msgs::msg::PoseArray::SharedPtr msg)
-  // { 
-  //   target_poses_.clear();
-  //   std::vector<geometry_msgs::msg::PoseStamped> target_poses;
-  //   for (const auto& pose : msg->poses)
-  //   {
-  //     geometry_msgs::msg::PoseStamped pose_stamped;
-  //     pose_stamped.pose = pose;
-  //     pose_stamped.header.frame_id = "gripper";
-  //     // pose_stamped.header.frame_id = "camera_depth_optical_frame";
-  //     pose_stamped.header.stamp = node_->get_clock()->now();
-
-  //     auto transformed_pose = transformPose(pose_stamped, "link_0");
-  //     target_poses_.push_back(transformed_pose);
-  //   }
-
-  //   packages_received_ = true;
-  // }
-
   void leafPoseArraysCallback(const custom_interfaces::msg::LeafPoseArrays::SharedPtr msg) 
   {
     all_target_poses_.clear();
+    all_target_poses_gripper_.clear();
+
     std::vector<std::vector<geometry_msgs::msg::Pose>> all_poses = {
       msg->poses1, msg->poses2, msg->poses3, msg->poses4, msg->poses5};
+
+    all_target_poses_gripper_ = all_poses;
 
     for (const auto& pose_array : all_poses) 
     {
@@ -491,4 +473,3 @@ int main(int argc, char** argv)
   }
   return 0;
 }
- 

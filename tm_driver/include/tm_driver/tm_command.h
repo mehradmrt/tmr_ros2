@@ -136,7 +136,7 @@ public:
 	More details please refer to the TM_Robot_Expression.pdf Chapter 9.18 */
 	static std::string set_pvt_point(TmPvtMode mode, const TmPvtPoint &point, int precision = 5)
 	{
-		return set_pvt_point(mode, point.time, point.positions, point.velocities, precision);
+		return set_pvt_point(mode, point.time, point.positions, point.velocities*2, precision);
 	}
 
 /*	Setting target, velocity and total time.

@@ -86,6 +86,7 @@ void TmRos2SctMoveit::execute_traj(
   //reorder_traj_joints(traj_points, goal_handle->get_goal()->trajectory);
   auto &traj_points = goal_handle->get_goal()->trajectory.points;
 
+ 
   if (!is_positions_match(traj_points.front(), 0.01)) {
     result->error_code = result->PATH_TOLERANCE_VIOLATED;
     result->error_string = "Start point doesn't match current pose";
@@ -94,7 +95,7 @@ void TmRos2SctMoveit::execute_traj(
 
     //goal_handle->abort(result);
   }
-
+  
   auto pvts = get_pvt_traj(traj_points, 0.025);
   print_info("TM_ROS: traj. total time:= %d", (int)pvts->total_time);
   //RCLCPP_INFO_STREAM(rclcpp::get_logger("rclcpp"),"TM_ROS: traj. total time:=" << pvts->total_time);

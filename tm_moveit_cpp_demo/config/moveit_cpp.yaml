@@ -14,10 +14,10 @@ run_moveit_cpp:
       pipeline_names: ["ompl"]
     
     plan_request_params:
-      planning_attempts: 3
+      planning_attempts: 15
       planning_pipeline: ompl
       max_velocity_scaling_factor: 1.0
       max_acceleration_scaling_factor: 1.0
-      planner_id: "RRTstar"
-      planning_time: 3.0
-      
+      # planner_id: "RRTstar"
+      # planner_id: "RRTstar"
+      # planning_time: 2.0

@@ -24,7 +24,7 @@ int main(int argc, char **argv)
   request->positions.push_back(1.5707);
   request->positions.push_back(0.0);
   request->positions.push_back(0.90);
-  request->velocity = 0.8;//rad/s
+  request->velocity = 1.2;//rad/s
   request->acc_time = 0.2;
   request->blend_percentage = 20;
   request->fine_goal = false;

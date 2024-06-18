@@ -11,8 +11,6 @@
 
   <depend>onrobot_rg_msgs</depend>
   <depend>custom_interfaces</depend>
-
-
   <buildtool_depend>ament_cmake</buildtool_depend>
   
   <!-- <depend>rviz_visual_tools</depend>
