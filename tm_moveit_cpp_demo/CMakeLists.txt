@@ -56,7 +56,7 @@ if (moveit_ros_planning_interface_FOUND)
     Boost
     onrobot_rg_msgs
     custom_interfaces
-    # moveit_visual_tools
+    moveit_visual_tools
     # rviz_visual_tools
   )
 

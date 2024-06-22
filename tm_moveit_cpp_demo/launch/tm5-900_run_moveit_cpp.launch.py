@@ -158,7 +158,8 @@ def generate_launch_description():
         )
     '''
 
-    return LaunchDescription([  rviz_node,
+    return LaunchDescription([  
+                                rviz_node,
                                 tm_driver_node, 
                                 static_tf,
                                 robot_state_publisher,

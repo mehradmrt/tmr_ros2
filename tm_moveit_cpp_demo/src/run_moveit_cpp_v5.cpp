@@ -45,7 +45,6 @@
 
 #include <thread>
 #include <rclcpp/rclcpp.hpp>
-
 #include <moveit/moveit_cpp/moveit_cpp.h>
 #include <moveit/moveit_cpp/planning_component.h>
 #include <moveit/robot_state/conversions.h>
@@ -53,7 +52,6 @@
 
 // #include <moveit_visual_tools/moveit_visual_tools.h>
 // #include <rviz_visual_tools/rviz_visual_tools.hpp>
-
 // #include <moveit/robot_model_loader/robot_model_loader.h>
 
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
@@ -93,8 +91,8 @@ public:
     RCLCPP_INFO(LOGGER, "Initialize MoveItCpp");
     moveit_cpp_ = std::make_shared<moveit::planning_interface::MoveItCpp>(node_);
     moveit_cpp_->getPlanningSceneMonitor()->providePlanningSceneService();  // let RViz display query PlanningScene
-    moveit_cpp_->getPlanningSceneMonitor()->setPlanningScenePublishingFrequency(100);
-
+    moveit_cpp_->getPlanningSceneMonitorNonConst()->setPlanningScenePublishingFrequency(100);
+    
     RCLCPP_INFO(LOGGER, "Initialize PlanningComponent");
     moveit::planning_interface::PlanningComponent arm("tmr_arm", moveit_cpp_);
     
@@ -105,11 +103,9 @@ public:
     // auto planning_scene_monitor = moveit_cpp_->getPlanningSceneMonitor();
     // planning_scene_monitor->triggerSceneUpdateEvent(planning_scene_monitor::PlanningSceneMonitor::UPDATE_SCENE);
 
-
     // moveit_cpp::PlanningComponent::PlanRequestParameters params;
     // params.max_velocity_scaling_factor = 1.0;
     // params.max_acceleration_scaling_factor = 1.0;
-
 
     // namespace rvt = rviz_visual_tools;
     // moveit_visual_tools::MoveItVisualTools visual_tools(node_, "link_0", "moveit_cpp_",
@@ -117,15 +113,8 @@ public:
     // visual_tools.deleteAllMarkers();
     // visual_tools.loadRemoteControl();
 
-    // Eigen::Isometry3d text_pose = Eigen::Isometry3d::Identity();
-    // text_pose.translation().z() = 1.75;
-    // visual_tools.publishText(text_pose, "MoveItCpp_Demo", rvt::WHITE, rvt::XLARGE);
-    // visual_tools.trigger();
+    // Eigen::Isometry3d text_pose = Eigen::Isometry3LeafPoseArraysject;
 
-    // A little delay before running the plan
-    rclcpp::sleep_for(std::chrono::seconds(1));
-
-    // Create collision object, planning shouldn't be too easy
     moveit_msgs::msg::CollisionObject collision_object;
     collision_object.header.frame_id = "base";
     collision_object.id = "box";
@@ -162,7 +151,7 @@ public:
 
       shape_msgs::msg::SolidPrimitive leaf_box;
       leaf_box.type = leaf_box.BOX;
-      leaf_box.dimensions = { 0.01, 0.1, 0.05 };
+      leaf_box.dimensions = { 0.01, 0.12, 0.07 };
 
       geometry_msgs::msg::Pose leaf_box_pose = all_target_poses_gripper_[0][k]; 
 
@@ -174,7 +163,7 @@ public:
         scene->processCollisionObjectMsg(collision_leaf);
       }
     }
-
+    
     // ------------------------------------------
     // ------------ Planning Begins -------------
     // ------------------------------------------
@@ -188,7 +177,7 @@ public:
         const auto& pose = all_target_poses_[j][i];
         RCLCPP_INFO(LOGGER, "Setting goal for point %zu with pose %zu", i+1, j+1);
         arm.setGoal(pose, "gripper");
-        
+
         RCLCPP_INFO(LOGGER, "Planning to goal for point %zu, with pose %zu", i+1, j+1);
         auto plan_solution = arm.plan();
 
@@ -205,7 +194,7 @@ public:
               RCLCPP_INFO(LOGGER, "Gripper reached the goal for point %zu, with pose %zu.", i+1, j+1);
               bool goalReached = true;
 
-              rclcpp::sleep_for(std::chrono::seconds(3));
+              // rclcpp::sleep_for(std::chrono::seconds(1));
               performServiceCalls();
               break;
             }
@@ -218,33 +207,33 @@ public:
 
           rclcpp::sleep_for(std::chrono::seconds(3));
 
-          arm.setGoal(*robot_first_state);
-          auto return_plan_solution = arm.plan();
-          if (return_plan_solution)
-          {
-            RCLCPP_INFO(LOGGER, "Returning to initial state.");
-            arm.execute();
+          // arm.setGoal(*robot_first_state);
+          // auto return_plan_solution = arm.plan();
+          // if (return_plan_solution)
+          // {
+          //   RCLCPP_INFO(LOGGER, "Returning to initial state.");
+          //   arm.execute();
 
-            RCLCPP_INFO(LOGGER, "Waiting for robot to reach first state...");
-            bool FirstStateReached = false;
+          //   RCLCPP_INFO(LOGGER, "Waiting for robot to reach first state...");
+          //   bool FirstStateReached = false;
 
-            while (rclcpp::ok())
-            { 
-              auto current_state = moveit_cpp_->getCurrentState();
-              if (isRobotBack(current_state, robot_first_state)) 
-              { 
-                RCLCPP_INFO(LOGGER, "Robot reached its first state.");
-                rclcpp::sleep_for(std::chrono::seconds(3));
-                FirstStateReached = true;
-                break;
-              } 
-              else 
-              {
-                RCLCPP_INFO(LOGGER, "Robot has NOT reached its first state.");
-                rclcpp::sleep_for(std::chrono::seconds(3));
-              }
-            }
-          }
+          //   while (rclcpp::ok())
+          //   { 
+          //     auto current_state = moveit_cpp_->getCurrentState();
+          //     if (isRobotBack(current_state, robot_first_state)) 
+          //     { 
+          //       RCLCPP_INFO(LOGGER, "Robot reached its first state.");
+          //       rclcpp::sleep_for(std::chrono::seconds(3));
+          //       FirstStateReached = true;
+          //       break;
+          //     } 
+          //     else 
+          //     {
+          //       RCLCPP_INFO(LOGGER, "Robot has NOT reached its first state.");
+          //       rclcpp::sleep_for(std::chrono::seconds(3));
+          //     }
+          //   }
+          // }
           planFound = true;
           break; 
         }
@@ -364,7 +353,7 @@ public:
 
     auto request_spectrum = std::make_shared<custom_interfaces::srv::GetSpectrum::Request>();
     auto future_spectrum = get_spectrum_client_->async_send_request(request_spectrum);
-    rclcpp::sleep_for(std::chrono::seconds(3)); 
+    rclcpp::sleep_for(std::chrono::seconds(1)); 
 
     request_rg->command = 'o';
     auto future_rg_second = onrobot_rg_set_command_client_->async_send_request(request_rg);
