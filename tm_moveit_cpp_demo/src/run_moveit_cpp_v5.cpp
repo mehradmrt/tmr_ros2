@@ -1,48 +1,3 @@
-/*********************************************************************
- *  run_moveit_cpp.cpp
- * 
- *  Various portions of the code are based on original source from 
- *  PickNik Inc.
- *  and are used in accordance with the following license. */
-
-/*********************************************************************
- * Software License Agreement (BSD License)
- *
- *  Copyright (c) 2020, PickNik Inc.
- *  All rights reserved.
- *
- *  Redistribution and use in source and binary forms, with or without
- *  modification, are permitted provided that the following conditions
- *  are met:
- *
- *   * Redistributions of source code must retain the above copyright
- *     notice, this list of conditions and the following disclaimer.
- *   * Redistributions in binary form must reproduce the above
- *     copyright notice, this list of conditions and the following
- *     disclaimer in the documentation and/or other materials provided
- *     with the distribution.
- *   * Neither the name of PickNik Inc. nor the names of its
- *     contributors may be used to endorse or promote products derived
- *     from this software without specific prior written permission.
- *
- *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
- *  FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
- *  COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
- *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- *  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- *  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- *  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- *  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
- *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- *  POSSIBILITY OF SUCH DAMAGE.
- *********************************************************************/
-
-/*
-   Desc: A simple demo node running MoveItCpp for planning and execution
-*/
-
 #include <thread>
 #include <rclcpp/rclcpp.hpp>
 #include <moveit/moveit_cpp/moveit_cpp.h>
@@ -63,6 +18,11 @@
 #include "custom_interfaces/srv/get_spectrum.hpp"
 #include "custom_interfaces/msg/leaf_pose_arrays.hpp"
 
+#include <nlohmann/json.hpp>
+#include <fstream>
+#include <chrono>
+#include <filesystem>
+namespace fs = std::filesystem;
 
 static const rclcpp::Logger LOGGER = rclcpp::get_logger("moveit_cpp_demo");
 
@@ -107,14 +67,6 @@ public:
     // params.max_velocity_scaling_factor = 1.0;
     // params.max_acceleration_scaling_factor = 1.0;
 
-    // namespace rvt = rviz_visual_tools;
-    // moveit_visual_tools::MoveItVisualTools visual_tools(node_, "link_0", "moveit_cpp_",
-    //                                                 moveit_cpp_->getPlanningSceneMonitor());
-    // visual_tools.deleteAllMarkers();
-    // visual_tools.loadRemoteControl();
-
-    // Eigen::Isometry3d text_pose = Eigen::Isometry3LeafPoseArraysject;
-
     moveit_msgs::msg::CollisionObject collision_object;
     collision_object.header.frame_id = "base";
     collision_object.id = "box";
@@ -124,7 +76,7 @@ public:
     box.dimensions = { 1.0, 0.8, 0.4 };
 
     tf2::Quaternion box_quat;
-    box_quat.setRPY(0, 0, 0);  // quat.setRPY(0, 0, -M_PI / 4); Rotate -45 degrees around Z-axis
+    box_quat.setRPY(0, 0, 0); // quat.setRPY(0, 0, -M_PI / 4); Rotate -45 degrees around Z-axis
 
     geometry_msgs::msg::Pose box_pose;
     box_pose.position.x = -0.35;  
@@ -136,7 +88,6 @@ public:
     collision_object.primitive_poses.push_back(box_pose);
     collision_object.operation = collision_object.ADD;
 
-    // Add object to planning scene
     {  // Lock PlanningScene
       planning_scene_monitor::LockedPlanningSceneRW scene(moveit_cpp_->getPlanningSceneMonitor());
       scene->processCollisionObjectMsg(collision_object);
@@ -147,7 +98,7 @@ public:
     {
       moveit_msgs::msg::CollisionObject collision_leaf;
       collision_leaf.header.frame_id = "gripper";
-      collision_leaf.id = "leaf_" + std::to_string(k);
+      collision_leaf.id = "leaf_" + std::to_string(k+1);
 
       shape_msgs::msg::SolidPrimitive leaf_box;
       leaf_box.type = leaf_box.BOX;
@@ -168,39 +119,38 @@ public:
     // ------------ Planning Begins -------------
     // ------------------------------------------
 
-    performServiceCalls();
+    performServiceCalls("reference","reference");
     for (size_t i = 0; i < all_target_poses_[0].size(); ++i)
     {
       bool planFound = false;
       for (size_t j = 0; j < all_target_poses_.size(); ++j)
       {
         const auto& pose = all_target_poses_[j][i];
-        RCLCPP_INFO(LOGGER, "Setting goal for point %zu with pose %zu", i+1, j+1);
+        RCLCPP_INFO(LOGGER, "Setting goal for leaf %zu with pose %zu", i+1, j+1);
         arm.setGoal(pose, "gripper");
 
-        RCLCPP_INFO(LOGGER, "Planning to goal for point %zu, with pose %zu", i+1, j+1);
+        RCLCPP_INFO(LOGGER, "Planning to goal for leaf %zu, with pose %zu", i+1, j+1);
         auto plan_solution = arm.plan();
 
         if(plan_solution) 
         { 
           outcome_log += "Point " + std::to_string(i+1) + "Pose "+ std::to_string(j+1) +": SUCCESS\n";
-          RCLCPP_INFO(LOGGER, "Plan found for point %zu", i+1);
+          RCLCPP_INFO(LOGGER, "Plan found for leaf %zu", i+1);
           arm.execute();
           bool goalReached = false;
           while (rclcpp::ok())
           {
             if (PoseCompare("gripper", "link_0", pose, 0.001, 0.05)) 
             {
-              RCLCPP_INFO(LOGGER, "Gripper reached the goal for point %zu, with pose %zu.", i+1, j+1);
+              RCLCPP_INFO(LOGGER, "Gripper reached the goal for leaf %zu, with pose %zu.", i+1, j+1);
               bool goalReached = true;
 
-              // rclcpp::sleep_for(std::chrono::seconds(1));
-              performServiceCalls();
+              performServiceCalls("Leaf_" + std::to_string(i+1), "Pose_" + std::to_string(j+1));
               break;
             }
             else 
             {
-              RCLCPP_INFO(LOGGER, "Gripper has not reached the goal for point %zu, with pose %zu yet.", i+1, j+1);
+              RCLCPP_INFO(LOGGER, "Gripper has not reached the goal for leaf %zu, with pose %zu yet.", i+1, j+1);
               rclcpp::sleep_for(std::chrono::seconds(3));
             }
           }
@@ -220,7 +170,7 @@ public:
           //   while (rclcpp::ok())
           //   { 
           //     auto current_state = moveit_cpp_->getCurrentState();
-          //     if (isRobotBack(current_state, robot_first_state)) 
+          //     if (isRobotBack(curre  nt_state, robot_first_state)) 
           //     { 
           //       RCLCPP_INFO(LOGGER, "Robot reached its first state.");
           //       rclcpp::sleep_for(std::chrono::seconds(3));
@@ -234,6 +184,7 @@ public:
           //     }
           //   }
           // }
+
           planFound = true;
           break; 
         }
@@ -335,7 +286,7 @@ public:
     return true;
   }
 
-  void performServiceCalls() 
+  void performServiceCalls(const std::string& leaf_x, const std::string& pose_x) 
   {
     if (!onrobot_rg_set_command_client_->wait_for_service(std::chrono::seconds(1))) {
         RCLCPP_ERROR(node_->get_logger(), "/onrobot_rg/set_command service not available.");
@@ -345,7 +296,7 @@ public:
         RCLCPP_ERROR(node_->get_logger(), "/get_spectrum service not available.");
         return;
     }
-    
+ 
     auto request_rg = std::make_shared<onrobot_rg_msgs::srv::SetCommand::Request>();
     request_rg->command = 'c';
     auto future_rg = onrobot_rg_set_command_client_->async_send_request(request_rg);
@@ -353,13 +304,55 @@ public:
 
     auto request_spectrum = std::make_shared<custom_interfaces::srv::GetSpectrum::Request>();
     auto future_spectrum = get_spectrum_client_->async_send_request(request_spectrum);
-    rclcpp::sleep_for(std::chrono::seconds(1)); 
+    rclcpp::sleep_for(std::chrono::seconds(1));
 
+    if (rclcpp::spin_until_future_complete(node_, future_spectrum) == rclcpp::FutureReturnCode::SUCCESS) {
+        try {
+            auto response_spectrum = future_spectrum.get();
+            RCLCPP_INFO(LOGGER, "Received spectrum successfully.");
+            save_to_json(leaf_x, pose_x, response_spectrum->wavelengths, response_spectrum->spectrum);
+        } catch (const std::exception& e) {
+            RCLCPP_ERROR(LOGGER, "Exception caught while getting response: %s", e.what());
+        }
+    } else {
+        RCLCPP_ERROR(LOGGER, "Timeout or error waiting for /get_spectrum service response.");
+    }
+
+    RCLCPP_INFO(LOGGER, "Here3");
     request_rg->command = 'o';
     auto future_rg_second = onrobot_rg_set_command_client_->async_send_request(request_rg);
     // rclcpp::sleep_for(std::chrono::seconds(3)); 
-  } 
+  }
 
+    void save_to_json(const std::string& leaf_x, const std::string& pose_x, const std::vector<uint16_t>& wavelengths, const std::vector<double>& spectrum) {
+      nlohmann::json j;
+      j["leaf_number"] = leaf_x;
+      j["pose_number"] = pose_x;
+      j["wavelengths"] = wavelengths;
+      j["spectrum"] = spectrum;
+      
+      auto today = std::chrono::system_clock::now();
+      std::time_t today_time = std::chrono::system_clock::to_time_t(today);
+      char date_str[100];
+      strftime(date_str, sizeof(date_str), "%m-%d-%Y", std::localtime(&today_time));
+      
+      std::string base_path = "/run/results/" + std::string(date_str);
+      std::string latest_path;
+      for (const auto& entry : fs::directory_iterator(base_path)) {
+          if (entry.is_directory()) {
+              latest_path = entry.path().string(); 
+          }
+      }
+
+      std::string file_name = leaf_x + ".json";
+      std::string file_path = latest_path + "/" + file_name;
+      std::ofstream file(file_path); 
+      file << j.dump(4) << std::endl;
+      file.close();
+    }
+  
+  
+  
   void processNewData()
   {
       if (packages_received_)
