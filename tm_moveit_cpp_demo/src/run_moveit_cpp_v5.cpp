@@ -16,12 +16,14 @@
 
 #include "onrobot_rg_msgs/srv/set_command.hpp"
 #include "custom_interfaces/srv/get_spectrum.hpp"
+#include "custom_interfaces/msg/nano_spec.hpp"
 #include "custom_interfaces/msg/leaf_pose_arrays.hpp"
 
 #include <nlohmann/json.hpp>
 #include <fstream>
 #include <chrono>
 #include <filesystem>
+using namespace std::chrono_literals;
 namespace fs = std::filesystem;
 
 static const rclcpp::Logger LOGGER = rclcpp::get_logger("moveit_cpp_demo");
@@ -35,14 +37,20 @@ public:
     , tfListener_(*tfBuffer_)
     , robot_state_publisher_(node_->create_publisher<moveit_msgs::msg::DisplayRobotState>("display_robot_state", 1))
     , onrobot_rg_set_command_client_(node_->create_client<onrobot_rg_msgs::srv::SetCommand>("/onrobot_rg/set_command"))
-    , get_spectrum_client_(node_->create_client<custom_interfaces::srv::GetSpectrum>("/get_spectrum"))
+    // , get_spectrum_client_(node_->create_client<custom_interfaces::srv::GetSpectrum>("/get_spectrum"))
     
   {
-    // target_leaves_subscriber_ = node_->create_subscription<geometry_msgs::msg::PoseArray>(
-    //         "/target_leaves", 10, std::bind(&MoveItCppDemo::targetLeavesCallback, this, std::placeholders::_1));
 
     leaf_pose_arrays_subscriber_ = node_->create_subscription<custom_interfaces::msg::LeafPoseArrays>(
         "/target_leaves_multi_pose", 10, std::bind(&MoveItCppDemo::leafPoseArraysCallback, this, std::placeholders::_1));
+
+    spectral_data_subscriber_ = node_->create_subscription<custom_interfaces::msg::NanoSpec>(
+        "/spectral_data", 10, [this](const custom_interfaces::msg::NanoSpec::SharedPtr msg) {
+            spectralDataCallback(msg, "leaf_x", "pose_x"); 
+        });
+
+    spec_service_trigger_publisher_ = node_->create_publisher<std_msgs::msg::String>("spec_service_trigger", 10);
+       
 
   }
 
@@ -289,67 +297,128 @@ public:
   void performServiceCalls(const std::string& leaf_x, const std::string& pose_x) 
   {
     if (!onrobot_rg_set_command_client_->wait_for_service(std::chrono::seconds(1))) {
-        RCLCPP_ERROR(node_->get_logger(), "/onrobot_rg/set_command service not available.");
-        return;
-    }
-    if (!get_spectrum_client_->wait_for_service(std::chrono::seconds(1))) {
-        RCLCPP_ERROR(node_->get_logger(), "/get_spectrum service not available.");
+        RCLCPP_ERROR(LOGGER, "/onrobot_rg/set_command service not available.");
         return;
     }
  
     auto request_rg = std::make_shared<onrobot_rg_msgs::srv::SetCommand::Request>();
     request_rg->command = 'c';
     auto future_rg = onrobot_rg_set_command_client_->async_send_request(request_rg);
+    RCLCPP_INFO(LOGGER, "GRIPPER CLOESE");
     rclcpp::sleep_for(std::chrono::seconds(3)); 
-
-    auto request_spectrum = std::make_shared<custom_interfaces::srv::GetSpectrum::Request>();
-    auto future_spectrum = get_spectrum_client_->async_send_request(request_spectrum);
-    rclcpp::sleep_for(std::chrono::seconds(1));
-
-    if (rclcpp::spin_until_future_complete(node_, future_spectrum) == rclcpp::FutureReturnCode::SUCCESS) {
-        try {
-            auto response_spectrum = future_spectrum.get();
-            RCLCPP_INFO(LOGGER, "Received spectrum successfully.");
-            save_to_json(leaf_x, pose_x, response_spectrum->wavelengths, response_spectrum->spectrum);
-        } catch (const std::exception& e) {
-            RCLCPP_ERROR(LOGGER, "Exception caught while getting response: %s", e.what());
-        }
-    } else {
-        RCLCPP_ERROR(LOGGER, "Timeout or error waiting for /get_spectrum service response.");
+    
+    spectrum_var_ = false;
+    NanoSpecTrigger(leaf_x, pose_x);
+    auto start_time = std::chrono::steady_clock::now();
+    while (rclcpp::ok() && std::chrono::steady_clock::now() - start_time < 5s) {
+      rclcpp::spin_some(node_);
+      if (spectrum_var_) {
+        break;
+      }
+      rclcpp::sleep_for(std::chrono::milliseconds(100));
     }
+    if (!spectrum_var_) {
+      RCLCPP_WARN(LOGGER, "No spectral data received within 3 seconds.");
+    }
+    RCLCPP_INFO(LOGGER, "SPECTRAL DATA PROCESSED");
+    rclcpp::sleep_for(std::chrono::seconds(5));
 
-    RCLCPP_INFO(LOGGER, "Here3");
     request_rg->command = 'o';
     auto future_rg_second = onrobot_rg_set_command_client_->async_send_request(request_rg);
-    // rclcpp::sleep_for(std::chrono::seconds(3)); 
+    RCLCPP_INFO(LOGGER, "GRIPPER OPENED");
+    rclcpp::sleep_for(std::chrono::seconds(5)); 
   }
 
-    void save_to_json(const std::string& leaf_x, const std::string& pose_x, const std::vector<uint16_t>& wavelengths, const std::vector<double>& spectrum) {
-      nlohmann::json j;
-      j["leaf_number"] = leaf_x;
-      j["pose_number"] = pose_x;
-      j["wavelengths"] = wavelengths;
-      j["spectrum"] = spectrum;
-      
-      auto today = std::chrono::system_clock::now();
-      std::time_t today_time = std::chrono::system_clock::to_time_t(today);
-      char date_str[100];
-      strftime(date_str, sizeof(date_str), "%m-%d-%Y", std::localtime(&today_time));
-      
-      std::string base_path = "/run/results/" + std::string(date_str);
-      std::string latest_path;
-      for (const auto& entry : fs::directory_iterator(base_path)) {
-          if (entry.is_directory()) {
-              latest_path = entry.path().string(); 
-          }
-      }
 
-      std::string file_name = leaf_x + ".json";
-      std::string file_path = latest_path + "/" + file_name;
-      std::ofstream file(file_path); 
+  void NanoSpecTrigger(const std::string& leaf_x, const std::string& pose_x)
+  {
+    spectral_data_subscriber_ = node_->create_subscription<custom_interfaces::msg::NanoSpec>(
+    "/spectral_data", 10, [this, leaf_x, pose_x](const custom_interfaces::msg::NanoSpec::SharedPtr msg) {
+        spectralDataCallback(msg, leaf_x, pose_x);
+    });
+
+    auto message = std::make_shared<std_msgs::msg::String>();
+    message->data = "trigger";
+    spec_service_trigger_publisher_->publish(*message);
+    RCLCPP_INFO(LOGGER, "Trigger sent to spec_service_trigger topic.");
+    
+  }
+
+  void spectralDataCallback(const custom_interfaces::msg::NanoSpec::SharedPtr msg, const std::string& leaf_x, const std::string& pose_x)
+  {
+    std::thread([this, msg, leaf_x, pose_x]() {
+      RCLCPP_INFO(LOGGER, "Processing spectral data in a separate thread.");
+
+      std::string wavelengths_str = "Wavelengths: ";
+      for (const auto& wavelength : msg->wavelengths)
+      {
+          wavelengths_str += std::to_string(wavelength) + " ";
+      }
+      RCLCPP_INFO(LOGGER, wavelengths_str.c_str());
+
+      std::string spectrum_str = "Spectrum: ";
+      for (const auto& spectrum_value : msg->spectrum)
+      {
+          spectrum_str += std::to_string(spectrum_value) + " ";
+      }
+      RCLCPP_INFO(LOGGER, spectrum_str.c_str());
+
+      save_to_json(leaf_x, pose_x, msg->wavelengths, msg->spectrum);
+      spectrum_var_ = true;
+    }).detach();
+  }
+
+  void save_to_json( const std::string& leaf_x, const std::string& pose_x, const std::vector<uint16_t>& wavelengths, const std::vector<double>& spectrum) {
+    nlohmann::json j;
+    j["leaf_number"] = leaf_x;
+    j["pose_number"] = pose_x;
+    j["wavelengths"] = wavelengths;
+    j["spectrum"] = spectrum;
+
+    auto today = std::chrono::system_clock::now();
+    std::time_t today_time = std::chrono::system_clock::to_time_t(today);
+    std::stringstream date_stream;
+    date_stream << std::put_time(std::localtime(&today_time), "%m-%d-%Y");
+    std::string date_str = date_stream.str();
+
+    std::string current_path = fs::current_path().string();
+    RCLCPP_INFO(LOGGER, "Current working directory: %s", current_path.c_str());
+
+    std::string base_path = current_path + "/runs/results/" + date_str;
+    if (!fs::exists(base_path)) {
+        RCLCPP_ERROR(LOGGER, "Directory does not exist: %s", base_path.c_str());
+        return;
+    }
+
+    int latest_results_number = -1;
+    std::string latest_results_folder;
+    for (const auto& entry : fs::directory_iterator(base_path)) {
+        if (entry.is_directory() && entry.path().filename().string().find("results") == 0) {
+            int results_number = std::stoi(entry.path().filename().string().substr(7));
+            if (results_number > latest_results_number) {
+                latest_results_number = results_number;
+                latest_results_folder = entry.path().string();
+            }
+        }
+    }
+
+    if (latest_results_folder.empty()) {
+        RCLCPP_ERROR(LOGGER, "No valid results folder found in: %s", base_path.c_str());
+        return;
+    }
+
+    
+    std::string file_name = leaf_x + ".json";
+    std::string file_path = latest_results_folder+ "/" + file_name;
+    std::ofstream file(file_path);
+    if (file.is_open()) {
       file << j.dump(4) << std::endl;
       file.close();
+      RCLCPP_INFO(LOGGER, "Saved JSON to: %s", file_path.c_str());
+    } else {
+      RCLCPP_ERROR(LOGGER, "Failed to open file: %s", file_path.c_str());
     }
+  }
   
   
   
@@ -374,17 +443,18 @@ private:
   rclcpp::Publisher<moveit_msgs::msg::DisplayRobotState>::SharedPtr robot_state_publisher_;
   moveit::planning_interface::MoveItCppPtr moveit_cpp_;
   
-  // rclcpp::Subscription<geometry_msgs::msg::PoseArray>::SharedPtr target_leaves_subscriber_;
   rclcpp::Subscription<custom_interfaces::msg::LeafPoseArrays>::SharedPtr leaf_pose_arrays_subscriber_;
+  rclcpp::Subscription<custom_interfaces::msg::NanoSpec>::SharedPtr spectral_data_subscriber_;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr spec_service_trigger_publisher_;
 
-  // std::vector<geometry_msgs::msg::PoseStamped> target_poses_;
   std::vector<std::vector<geometry_msgs::msg::PoseStamped>> all_target_poses_;
   std::vector<std::vector<geometry_msgs::msg::Pose>> all_target_poses_gripper_;
 
   rclcpp::Client<onrobot_rg_msgs::srv::SetCommand>::SharedPtr onrobot_rg_set_command_client_;
-  rclcpp::Client<custom_interfaces::srv::GetSpectrum>::SharedPtr get_spectrum_client_;
+  // rclcpp::Client<custom_interfaces::srv::GetSpectrum>::SharedPtr get_spectrum_client_;
 
   bool packages_received_ = false;
+  bool spectrum_var_ = false;
 
   geometry_msgs::msg::PoseStamped transformPose(const geometry_msgs::msg::PoseStamped& input_pose, const std::string& target_frame)
   {
@@ -455,3 +525,4 @@ int main(int argc, char** argv)
   }
   return 0;
 }
+ 
