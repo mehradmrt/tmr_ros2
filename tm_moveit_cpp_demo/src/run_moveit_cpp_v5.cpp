@@ -56,6 +56,11 @@ public:
 
   void run()
   { 
+
+    // ----------------------------------------------------
+    // -------- Initializing the planning pipeline --------
+    // ----------------------------------------------------
+
     RCLCPP_INFO(LOGGER, "Initialize MoveItCpp");
     moveit_cpp_ = std::make_shared<moveit::planning_interface::MoveItCpp>(node_);
     moveit_cpp_->getPlanningSceneMonitor()->providePlanningSceneService();  // let RViz display query PlanningScene
@@ -75,19 +80,25 @@ public:
     // params.max_velocity_scaling_factor = 1.0;
     // params.max_acceleration_scaling_factor = 1.0;
 
+
+
+    // ------------------------------------------
+    // -------- Adding collision objects --------
+    // ------------------------------------------
+
     moveit_msgs::msg::CollisionObject collision_object;
     collision_object.header.frame_id = "base";
     collision_object.id = "box";
 
     shape_msgs::msg::SolidPrimitive box;
     box.type = box.BOX;
-    box.dimensions = { 1.0, 0.8, 0.4 };
+    box.dimensions = { 0.80, 0.90 , 0.4 };
 
     tf2::Quaternion box_quat;
     box_quat.setRPY(0, 0, 0); // quat.setRPY(0, 0, -M_PI / 4); Rotate -45 degrees around Z-axis
 
     geometry_msgs::msg::Pose box_pose;
-    box_pose.position.x = -0.35;  
+    box_pose.position.x = -0.25;  
     box_pose.position.y = 0.0; //0.25;
     box_pose.position.z = -0.15;
     box_pose.orientation = tf2::toMsg(box_quat);
@@ -96,10 +107,34 @@ public:
     collision_object.primitive_poses.push_back(box_pose);
     collision_object.operation = collision_object.ADD;
 
-    {  // Lock PlanningScene
+
+    // Add the wall behind the robot as a constraint to avoid collision
+    moveit_msgs::msg::CollisionObject collision_wall;
+    collision_wall.header.frame_id = "base";
+    collision_wall.id = "wall";
+
+    shape_msgs::msg::SolidPrimitive wall;
+    wall.type = wall.BOX;
+    wall.dimensions = { 0.01, 1.50, 1.0 };
+
+    tf2::Quaternion wall_quat;
+    wall_quat.setRPY(0, 0, 0);
+
+    geometry_msgs::msg::Pose wall_pose;
+    wall_pose.position.x = -0.65;  
+    wall_pose.position.y = 0.0;
+    wall_pose.position.z = 0.50;
+    wall_pose.orientation = tf2::toMsg(wall_quat);
+
+    collision_wall.primitives.push_back(wall);
+    collision_wall.primitive_poses.push_back(wall_pose);
+    collision_wall.operation = collision_wall.ADD;
+
+    {
       planning_scene_monitor::LockedPlanningSceneRW scene(moveit_cpp_->getPlanningSceneMonitor());
       scene->processCollisionObjectMsg(collision_object);
-    }  // Unlock PlanningScene
+      scene->processCollisionObjectMsg(collision_wall);
+    }  
 
     std::string outcome_log = "Planning outcomes for all points:\n";
     for (size_t k = 0; k < all_target_poses_gripper_[0].size(); ++k)
@@ -165,33 +200,33 @@ public:
 
           rclcpp::sleep_for(std::chrono::seconds(3));
 
-          // arm.setGoal(*robot_first_state);
-          // auto return_plan_solution = arm.plan();
-          // if (return_plan_solution)
-          // {
-          //   RCLCPP_INFO(LOGGER, "Returning to initial state.");
-          //   arm.execute();
+          arm.setGoal(*robot_first_state);
+          auto return_plan_solution = arm.plan();
+          if (return_plan_solution)
+          {
+            RCLCPP_INFO(LOGGER, "Returning to initial state.");
+            arm.execute();
 
-          //   RCLCPP_INFO(LOGGER, "Waiting for robot to reach first state...");
-          //   bool FirstStateReached = false;
+            RCLCPP_INFO(LOGGER, "Waiting for robot to reach first state...");
+            bool FirstStateReached = false;
 
-          //   while (rclcpp::ok())
-          //   { 
-          //     auto current_state = moveit_cpp_->getCurrentState();
-          //     if (isRobotBack(curre  nt_state, robot_first_state)) 
-          //     { 
-          //       RCLCPP_INFO(LOGGER, "Robot reached its first state.");
-          //       rclcpp::sleep_for(std::chrono::seconds(3));
-          //       FirstStateReached = true;
-          //       break;
-          //     } 
-          //     else 
-          //     {
-          //       RCLCPP_INFO(LOGGER, "Robot has NOT reached its first state.");
-          //       rclcpp::sleep_for(std::chrono::seconds(3));
-          //     }
-          //   }
-          // }
+            while (rclcpp::ok())
+            { 
+              auto current_state = moveit_cpp_->getCurrentState();
+              if (isRobotBack(current_state, robot_first_state)) 
+              { 
+                RCLCPP_INFO(LOGGER, "Robot reached its first state.");
+                rclcpp::sleep_for(std::chrono::seconds(3));
+                FirstStateReached = true;
+                break;
+              } 
+              else 
+              {
+                RCLCPP_INFO(LOGGER, "Robot has NOT reached its first state.");
+                rclcpp::sleep_for(std::chrono::seconds(3));
+              }
+            }
+          }
 
           planFound = true;
           break; 
@@ -326,9 +361,8 @@ public:
     request_rg->command = 'o';
     auto future_rg_second = onrobot_rg_set_command_client_->async_send_request(request_rg);
     RCLCPP_INFO(LOGGER, "GRIPPER OPENED");
-    rclcpp::sleep_for(std::chrono::seconds(5)); 
+    rclcpp::sleep_for(std::chrono::seconds(1)); 
   }
-
 
   void NanoSpecTrigger(const std::string& leaf_x, const std::string& pose_x)
   {
@@ -525,4 +559,3 @@ int main(int argc, char** argv)
   }
   return 0;
 }
- 

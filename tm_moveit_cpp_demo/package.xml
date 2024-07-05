@@ -8,6 +8,8 @@
   <maintainer email="leo.wu@tm-robot.com">leowu</maintainer>
   <maintainer email="yh.wang@tm-robot.com">Yh Wang</maintainer>
   <license>BSD</license>
+  
+  <maintainer email="smortazavi3@ucmerced.edu">Mehrad Mortazavi</maintainer>
 
   <depend>onrobot_rg_msgs</depend>
   <depend>custom_interfaces</depend>
