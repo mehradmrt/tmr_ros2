@@ -198,7 +198,7 @@ public:
             }
           }
 
-          rclcpp::sleep_for(std::chrono::seconds(3));
+          rclcpp::sleep_for(std::chrono::seconds(1));
 
           arm.setGoal(*robot_first_state);
           auto return_plan_solution = arm.plan();
@@ -233,12 +233,12 @@ public:
         }
         else
         {
-          RCLCPP_INFO(LOGGER, "No plan found for point %zu, with pose %zu", i+1, j+1);
+          RCLCPP_INFO(LOGGER, "No plan found for leaf %zu, with pose %zu", i+1, j+1);
           outcome_log += "Point " + std::to_string(i+1) + ", Pose "+ std::to_string(j+1) +": FAILED\n";
         }
       }
+      RCLCPP_INFO(LOGGER, "%s", outcome_log.c_str());
     }
-    RCLCPP_INFO(LOGGER, "%s", outcome_log.c_str());
   }
 
 
@@ -535,7 +535,6 @@ private:
     }
     packages_received_ = true;
   }
-
 };
 
 int main(int argc, char** argv)
