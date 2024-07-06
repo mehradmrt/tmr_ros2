@@ -198,7 +198,7 @@ public:
             }
           }
 
-          rclcpp::sleep_for(std::chrono::seconds(1));
+          rclcpp::sleep_for(std::chrono::seconds(2));
 
           arm.setGoal(*robot_first_state);
           auto return_plan_solution = arm.plan();
@@ -229,7 +229,9 @@ public:
           }
 
           planFound = true;
-          break; 
+          rclcpp::sleep_for(std::chrono::seconds(2));
+          break;
+
         }
         else
         {
@@ -554,7 +556,7 @@ int main(int argc, char** argv)
     rclcpp::spin_some(node);
     // std::this_thread::sleep_for(std::chrono::seconds(8)); 
     demo.processNewData();
-    std::this_thread::sleep_for(std::chrono::seconds(5)); 
+    std::this_thread::sleep_for(std::chrono::seconds(3)); 
   }
   return 0;
 }

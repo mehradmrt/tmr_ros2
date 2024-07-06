@@ -27,7 +27,7 @@ class MinimalSubscriber : public rclcpp::Node
                 msg->joint_pos[4] << ", " << 
                 msg->joint_pos[5] << ")"); 
       }
-      
+      RCLCPP_INFO_STREAM(this->get_logger(), "FeedbackState: project speed = " << msg->project_speed);
     }
     rclcpp::Subscription<tm_msgs::msg::FeedbackState>::SharedPtr subscription_;
     
