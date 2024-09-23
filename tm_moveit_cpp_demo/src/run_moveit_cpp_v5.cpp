@@ -51,7 +51,6 @@ public:
 
     spec_service_trigger_publisher_ = node_->create_publisher<std_msgs::msg::String>("spec_service_trigger", 10);
        
-
   }
 
   void run()
@@ -81,7 +80,6 @@ public:
     // params.max_acceleration_scaling_factor = 1.0;
 
 
-
     // ------------------------------------------
     // -------- Adding collision objects --------
     // ------------------------------------------
@@ -95,7 +93,8 @@ public:
     box.dimensions = { 0.80, 0.90 , 0.4 };
 
     tf2::Quaternion box_quat;
-    box_quat.setRPY(0, 0, 0); // quat.setRPY(0, 0, -M_PI / 4); Rotate -45 degrees around Z-axis
+    // box_quat.setRPY(0, 0, 0); 
+    box_quat.setRPY(0, 0, -M_PI / 4); //Rotate -45 degrees around Z-axis
 
     geometry_msgs::msg::Pose box_pose;
     box_pose.position.x = -0.25;  
@@ -107,7 +106,6 @@ public:
     collision_object.primitive_poses.push_back(box_pose);
     collision_object.operation = collision_object.ADD;
 
-
     // Add the wall behind the robot as a constraint to avoid collision
     moveit_msgs::msg::CollisionObject collision_wall;
     collision_wall.header.frame_id = "base";
@@ -116,12 +114,14 @@ public:
     shape_msgs::msg::SolidPrimitive wall;
     wall.type = wall.BOX;
     wall.dimensions = { 0.01, 1.50, 1.0 };
+    
 
     tf2::Quaternion wall_quat;
-    wall_quat.setRPY(0, 0, 0);
-
+    // wall_quat.setRPY(0, 0, 0);
+    wall_quat.setRPY(0, 0, -M_PI/4);
+    
     geometry_msgs::msg::Pose wall_pose;
-    wall_pose.position.x = -0.65;  
+    wall_pose.position.x = -0.85;  
     wall_pose.position.y = 0.0;
     wall_pose.position.z = 0.50;
     wall_pose.orientation = tf2::toMsg(wall_quat);
@@ -177,7 +177,7 @@ public:
 
         if(plan_solution) 
         { 
-          outcome_log += "Point " + std::to_string(i+1) + "Pose "+ std::to_string(j+1) +": SUCCESS\n";
+          outcome_log += "Leaf " + std::to_string(i+1) + ", Pose "+ std::to_string(j+1) +": SUCCESS\n";
           RCLCPP_INFO(LOGGER, "Plan found for leaf %zu", i+1);
           arm.execute();
           bool goalReached = false;
@@ -200,48 +200,51 @@ public:
 
           rclcpp::sleep_for(std::chrono::seconds(2));
 
-          arm.setGoal(*robot_first_state);
-          auto return_plan_solution = arm.plan();
-          if (return_plan_solution)
-          {
-            RCLCPP_INFO(LOGGER, "Returning to initial state.");
-            arm.execute();
-
-            RCLCPP_INFO(LOGGER, "Waiting for robot to reach first state...");
-            bool FirstStateReached = false;
-
-            while (rclcpp::ok())
-            { 
-              auto current_state = moveit_cpp_->getCurrentState();
-              if (isRobotBack(current_state, robot_first_state)) 
-              { 
-                RCLCPP_INFO(LOGGER, "Robot reached its first state.");
-                rclcpp::sleep_for(std::chrono::seconds(3));
-                FirstStateReached = true;
-                break;
-              } 
-              else 
-              {
-                RCLCPP_INFO(LOGGER, "Robot has NOT reached its first state.");
-                rclcpp::sleep_for(std::chrono::seconds(3));
-              }
-            }
-          }
-
           planFound = true;
-          rclcpp::sleep_for(std::chrono::seconds(2));
+          rclcpp::sleep_for(std::chrono::seconds(1));
           break;
 
         }
         else
         {
           RCLCPP_INFO(LOGGER, "No plan found for leaf %zu, with pose %zu", i+1, j+1);
-          outcome_log += "Point " + std::to_string(i+1) + ", Pose "+ std::to_string(j+1) +": FAILED\n";
+          outcome_log += "Leaf " + std::to_string(i+1) + ", Pose "+ std::to_string(j+1) +": FAILED\n";
         }
       }
       RCLCPP_INFO(LOGGER, "%s", outcome_log.c_str());
     }
+
+    arm.setGoal(*robot_first_state);
+    auto return_plan_solution = arm.plan();
+    if (return_plan_solution)
+    {
+      RCLCPP_INFO(LOGGER, "Returning to initial state.");
+      arm.execute();
+
+      RCLCPP_INFO(LOGGER, "Waiting for robot to reach first state...");
+      bool FirstStateReached = false;
+
+      while (rclcpp::ok())
+      { 
+        auto current_state = moveit_cpp_->getCurrentState();
+        if (isRobotBack(current_state, robot_first_state)) 
+        { 
+          RCLCPP_INFO(LOGGER, "Robot reached its first state.");
+          rclcpp::sleep_for(std::chrono::seconds(3));
+          FirstStateReached = true;
+          break;
+        } 
+        else 
+        {
+          RCLCPP_INFO(LOGGER, "Robot has NOT reached its first state.");
+          rclcpp::sleep_for(std::chrono::seconds(3));
+        }
+      }
+    }
   }
+
+
+
 
 
   bool PoseCompare(const std::string& target_frame, const std::string& reference_frame, const geometry_msgs::msg::PoseStamped& goal_pose, double position_tolerance, double orientation_tolerance) 
@@ -445,7 +448,7 @@ public:
 
     
     std::string file_name = leaf_x + ".json";
-    std::string file_path = latest_results_folder+ "/" + file_name;
+    std::string file_path = latest_results_folder + "/" + file_name;
     std::ofstream file(file_path);
     if (file.is_open()) {
       file << j.dump(4) << std::endl;
@@ -455,7 +458,6 @@ public:
       RCLCPP_ERROR(LOGGER, "Failed to open file: %s", file_path.c_str());
     }
   }
-  
   
   
   void processNewData()

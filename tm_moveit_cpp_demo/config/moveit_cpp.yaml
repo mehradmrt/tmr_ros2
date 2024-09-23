@@ -20,4 +20,4 @@ run_moveit_cpp:
       max_acceleration_scaling_factor: 1.0
       # planner_id: "RRTConnect"
       planner_id: "RRTConnect"
-      planning_time: 5.0
+      planning_time: 3.0
